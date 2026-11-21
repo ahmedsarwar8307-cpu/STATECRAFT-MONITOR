@@ -174,12 +174,6 @@ function Countries() {
               <small>Articles with detected countries</small>
             </div>
 
-            <div className="country-stat">
-              <span className="country-stat-label">TOTAL DATABASE ARTICLES</span>
-              <strong>{overview.total_articles}</strong>
-              <small>Including historical records</small>
-            </div>
-
           </div>
 
 
