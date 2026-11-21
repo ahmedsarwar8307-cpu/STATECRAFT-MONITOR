@@ -59,6 +59,7 @@ def parse_field(value):
         if item.strip()
     ]
 
+
 def get_published_timestamp(value):
     if not value:
         return float("-inf")
@@ -77,7 +78,6 @@ def get_published_timestamp(value):
         published_date = published_date.replace(tzinfo=timezone.utc)
 
     return published_date.timestamp()
-
 
 
 # Retrieve articles from the database
@@ -204,8 +204,11 @@ def get_country_details(country: str):
             source_counts[source] += 1
 
     return {
-       "country": country,
+        "country": country,
         "article_count": len(matching_articles),
+        "source_count": len(source_counts),
+        "topic_count": len(topic_counts),
+        "latest_coverage": matching_articles[0].get("published"),
         "topics": [
             {"topic": topic, "article_count": count}
             for topic, count in topic_counts.most_common()
