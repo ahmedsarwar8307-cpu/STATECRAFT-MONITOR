@@ -1,7 +1,7 @@
 from pathlib import Path
 import sqlite3
 from collections import Counter
-from datetime import datetime, timezone, timedelta
+from datetime import date, datetime, timezone, timedelta
 from email.utils import parsedate_to_datetime
 
 from fastapi import FastAPI, HTTPException, Query
@@ -415,7 +415,10 @@ def build_coverage_trends(articles, window_days=7):
             ),
             reverse=True,
         )
-        return results[:12]
+        return {
+            "total": len(results),
+            "items": results[:12],
+        }
 
     timeline_start = max(
         min(item[0] for item in dated_articles),
@@ -451,8 +454,10 @@ def build_coverage_trends(articles, window_days=7):
             "article_count": previous_article_count,
         },
         "dated_article_count": len(dated_articles),
-        "topics": compare_dimension("topics"),
-        "countries": compare_dimension("countries"),
+        "topic_count": compare_dimension("topics")["total"],
+        "country_count": compare_dimension("countries")["total"],
+        "topics": compare_dimension("topics")["items"],
+        "countries": compare_dimension("countries")["items"],
         "timeline": [
             {"date": (timeline_start + timedelta(days=offset)).isoformat(),
              "article_count": daily_counts.get(
