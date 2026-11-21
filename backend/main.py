@@ -1,7 +1,7 @@
 from pathlib import Path
 import sqlite3
 from collections import Counter
-from datetime import datetime, timezone
+from datetime import datetime, timezone, timedelta
 from email.utils import parsedate_to_datetime
 
 from fastapi import FastAPI, HTTPException, Query
@@ -344,6 +344,125 @@ def build_country_relationships(articles):
     }
 
 
+def build_coverage_trends(articles, window_days=7):
+    """Compare topic and country coverage in two windows ending at latest data date."""
+    dated_articles = []
+    for article in articles:
+        published_date = get_published_date(article.get("published"))
+        if published_date:
+            dated_articles.append((date.fromisoformat(published_date), article))
+
+    if not dated_articles:
+        return {
+            "available": False,
+            "message": "No valid publication dates are available for trend analysis.",
+            "dated_article_count": 0,
+            "topics": [],
+            "countries": [],
+            "timeline": [],
+        }
+
+    latest_date = max(item[0] for item in dated_articles)
+    recent_start = latest_date - timedelta(days=window_days - 1)
+    previous_end = recent_start - timedelta(days=1)
+    previous_start = previous_end - timedelta(days=window_days - 1)
+
+    def aggregate_dimension(field, start_date, end_date):
+        counts = Counter()
+        for published_date, article in dated_articles:
+            if start_date <= published_date <= end_date:
+                values = {
+                    value for value in parse_field(article.get(field))
+                    if value and value.casefold() != "unknown"
+                }
+                counts.update(values)
+        return counts
+
+    def compare_dimension(field):
+        recent = aggregate_dimension(field, recent_start, latest_date)
+        previous = aggregate_dimension(field, previous_start, previous_end)
+        names = set(recent) | set(previous)
+        results = []
+
+        for name in names:
+            recent_count = recent.get(name, 0)
+            previous_count = previous.get(name, 0)
+            difference = recent_count - previous_count
+
+            if previous_count == 0:
+                change_percent = None
+                status = "new" if recent_count else "no recent coverage"
+            else:
+                change_percent = round((difference / previous_count) * 100, 1)
+                status = "rising" if difference > 0 else (
+                    "declining" if difference < 0 else "stable"
+                )
+
+            results.append({
+                "name": name,
+                "recent_count": recent_count,
+                "previous_count": previous_count,
+                "change": difference,
+                "change_percent": change_percent,
+                "status": status,
+            })
+
+        results.sort(
+            key=lambda item: (
+                item["recent_count"],
+                item["change"],
+                item["name"].casefold(),
+            ),
+            reverse=True,
+        )
+        return results[:12]
+
+    timeline_start = max(
+        min(item[0] for item in dated_articles),
+        latest_date - timedelta(days=29),
+    )
+    daily_counts = Counter(
+        published_date.isoformat()
+        for published_date, _ in dated_articles
+        if timeline_start <= published_date <= latest_date
+    )
+
+    recent_article_count = sum(
+        1 for published_date, _ in dated_articles
+        if recent_start <= published_date <= latest_date
+    )
+    previous_article_count = sum(
+        1 for published_date, _ in dated_articles
+        if previous_start <= published_date <= previous_end
+    )
+
+    return {
+        "available": True,
+        "window_days": window_days,
+        "latest_data_date": latest_date.isoformat(),
+        "recent_window": {
+            "start": recent_start.isoformat(),
+            "end": latest_date.isoformat(),
+            "article_count": recent_article_count,
+        },
+        "previous_window": {
+            "start": previous_start.isoformat(),
+            "end": previous_end.isoformat(),
+            "article_count": previous_article_count,
+        },
+        "dated_article_count": len(dated_articles),
+        "topics": compare_dimension("topics"),
+        "countries": compare_dimension("countries"),
+        "timeline": [
+            {"date": (timeline_start + timedelta(days=offset)).isoformat(),
+             "article_count": daily_counts.get(
+                 (timeline_start + timedelta(days=offset)).isoformat(), 0
+             )}
+            for offset in range((latest_date - timeline_start).days + 1)
+        ],
+    }
+
+
 # API homepage
 @app.get("/")
 def home():
@@ -351,6 +470,15 @@ def home():
         "message": "STATECRAFT MONITOR API is operational",
         "version": "1.1.0",
     }
+
+
+# Topic and country coverage trends
+@app.get("/api/trends")
+def get_coverage_trends(
+    days: int = Query(default=7, ge=3, le=30),
+):
+    articles = get_all_articles()
+    return build_coverage_trends(articles, window_days=days)
 
 
 # Retrieve news articles
