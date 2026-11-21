@@ -2615,3 +2615,239 @@
     font-size: 21px;
   }
 }
+
+
+/* GEOPOLITICAL COVERAGE TRENDS */
+.trends-page .trend-controls {
+  display: flex;
+  align-items: end;
+  justify-content: space-between;
+  gap: 18px;
+  margin: 25px 0 17px;
+  padding: 17px 19px;
+  border: 1px solid var(--border);
+  background: var(--bg-card);
+}
+
+.trend-controls > div:first-child {
+  display: flex;
+  flex-direction: column;
+  gap: 7px;
+}
+
+.trend-controls > div:first-child strong {
+  color: var(--text-primary);
+  font-size: 14px;
+  font-weight: 600;
+}
+
+.trend-window-buttons {
+  display: flex;
+  gap: 6px;
+}
+
+.trend-window-buttons button {
+  min-width: 47px;
+  padding: 9px 12px;
+  border: 1px solid var(--border);
+  background: var(--bg-main);
+  color: var(--text-secondary);
+  font-family: inherit;
+  font-size: 11px;
+  font-weight: 700;
+  cursor: pointer;
+}
+
+.trend-window-buttons button:hover,
+.trend-window-buttons button.active {
+  border-color: var(--accent);
+  background: var(--bg-card-hover);
+  color: var(--accent-light);
+}
+
+.trend-period-note {
+  display: flex;
+  justify-content: space-between;
+  flex-wrap: wrap;
+  gap: 9px;
+  margin: 18px 0 10px;
+  color: var(--text-muted);
+  font-size: 10px;
+  letter-spacing: 0.8px;
+}
+
+.trend-period-note strong {
+  color: var(--text-primary);
+}
+
+.trend-overview {
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  margin: 0 0 14px;
+}
+
+.trend-timeline-panel {
+  margin-bottom: 13px;
+}
+
+.trend-timeline {
+  display: flex;
+  align-items: stretch;
+  gap: 8px;
+  min-height: 190px;
+  overflow-x: auto;
+  padding: 12px 2px 0;
+}
+
+.trend-day {
+  min-width: 45px;
+  flex: 1 0 45px;
+  display: grid;
+  grid-template-rows: 16px minmax(105px, 1fr) 30px;
+  justify-items: center;
+  gap: 7px;
+}
+
+.trend-day > strong {
+  color: var(--text-secondary);
+  font-size: 10px;
+}
+
+.trend-day-track {
+  width: 100%;
+  max-width: 29px;
+  height: 100%;
+  display: flex;
+  align-items: end;
+  overflow: hidden;
+  background: var(--bg-main);
+  border-bottom: 1px solid var(--border);
+}
+
+.trend-day-track i {
+  display: block;
+  width: 100%;
+  min-height: 0;
+  background: var(--accent);
+}
+
+.trend-day time {
+  color: var(--text-muted);
+  font-size: 9px;
+  white-space: nowrap;
+}
+
+.trend-analysis-grid {
+  align-items: start;
+}
+
+.trend-list-panel {
+  margin-bottom: 0;
+}
+
+.trend-row {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 12px;
+  padding: 12px 0;
+  border-top: 1px solid var(--border);
+}
+
+.trend-row-main {
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 5px;
+}
+
+.trend-row-main strong {
+  color: var(--text-primary);
+  font-size: 12px;
+  font-weight: 600;
+  overflow-wrap: anywhere;
+}
+
+.trend-row-main span {
+  color: var(--text-muted);
+  font-size: 10px;
+}
+
+.trend-row-result {
+  flex-shrink: 0;
+  display: flex;
+  flex-direction: column;
+  align-items: flex-end;
+  gap: 4px;
+}
+
+.trend-change {
+  font-size: 14px;
+  font-weight: 700;
+  font-variant-numeric: tabular-nums;
+}
+
+.trend-status {
+  font-size: 9px;
+  font-weight: 700;
+  letter-spacing: 0.7px;
+}
+
+.trend-rising,
+.trend-new {
+  color: #72b99b;
+}
+
+.trend-declining {
+  color: #d58d8d;
+}
+
+.trend-stable {
+  color: var(--text-muted);
+}
+
+.trend-highlight-row {
+  display: flex;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 12px 0;
+  border-top: 1px solid var(--border);
+  color: var(--text-secondary);
+  font-size: 12px;
+}
+
+.trend-highlight-row strong {
+  color: #72b99b;
+  font-size: 12px;
+}
+
+.trend-highlight-row strong.trend-declining {
+  color: #d58d8d;
+}
+
+@media (max-width: 900px) {
+  .trend-overview {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+}
+
+@media (max-width: 760px) {
+  .trends-page .trend-controls {
+    align-items: flex-start;
+    flex-direction: column;
+    padding: 14px;
+  }
+
+  .trend-analysis-grid {
+    grid-template-columns: 1fr;
+  }
+}
+
+@media (max-width: 420px) {
+  .trend-overview {
+    grid-template-columns: 1fr;
+  }
+
+  .trend-period-note {
+    flex-direction: column;
+  }
+}
