@@ -22,6 +22,12 @@ function Intelligence() {
   const [loadingOverview, setLoadingOverview] = useState(true)
   const [loadingDetails, setLoadingDetails] = useState(false)
   const [error, setError] = useState('')
+  const [relations, setRelations] = useState(null)
+  const [selectedPair, setSelectedPair] = useState(null)
+  const [pairDetails, setPairDetails] = useState(null)
+  const [loadingRelations, setLoadingRelations] = useState(true)
+  const [loadingPair, setLoadingPair] = useState(false)
+  const [relationError, setRelationError] = useState('')
 
   useEffect(() => {
     let active = true
@@ -86,6 +92,65 @@ function Intelligence() {
       active = false
     }
   }, [selectedRegion])
+
+  useEffect(() => {
+    let active = true
+
+    async function loadRelations() {
+      try {
+        const response = await fetch(`${API_BASE}/api/country-relations?limit=50`)
+        if (!response.ok) throw new Error('Unable to retrieve country relationship analysis.')
+
+        const data = await response.json()
+        if (!active) return
+
+        setRelations(data)
+        if (data.pairs.length) {
+          setSelectedPair({
+            country_a: data.pairs[0].country_a,
+            country_b: data.pairs[0].country_b,
+          })
+        }
+      } catch (loadError) {
+        if (active) setRelationError(loadError.message)
+      } finally {
+        if (active) setLoadingRelations(false)
+      }
+    }
+
+    loadRelations()
+    return () => { active = false }
+  }, [])
+
+  useEffect(() => {
+    if (!selectedPair) {
+      setPairDetails(null)
+      return undefined
+    }
+
+    let active = true
+
+    async function loadPairDetails() {
+      setLoadingPair(true)
+      setRelationError('')
+
+      try {
+        const params = new URLSearchParams(selectedPair)
+        const response = await fetch(`${API_BASE}/api/country-relations/pair?${params}`)
+        if (!response.ok) throw new Error('Unable to retrieve this country pair.')
+
+        const data = await response.json()
+        if (active) setPairDetails(data)
+      } catch (loadError) {
+        if (active) setRelationError(loadError.message)
+      } finally {
+        if (active) setLoadingPair(false)
+      }
+    }
+
+    loadPairDetails()
+    return () => { active = false }
+  }, [selectedPair])
 
   const maxTimelineValue = useMemo(() => {
     if (!details?.coverage_timeline?.length) return 1
@@ -303,6 +368,160 @@ function Intelligence() {
               )}
             </div>
           )}
+          <section className="relationship-section">
+            <div className="regional-section-heading">
+              <div>
+                <span className="section-kicker">COUNTRY-TO-COUNTRY INTELLIGENCE</span>
+                <h2>Shared news coverage</h2>
+              </div>
+              <span>Country co-mentions across articles</span>
+            </div>
+
+            {loadingRelations && (
+              <div className="regional-status">Analysing country pairs in the database...</div>
+            )}
+
+            {!loadingRelations && relationError && !relations && (
+              <div className="regional-status regional-error">{relationError}</div>
+            )}
+
+            {relations && (
+              <>
+                <div className="regional-overview relationship-overview">
+                  <div className="regional-stat">
+                    <span>COUNTRIES WITH SHARED COVERAGE</span>
+                    <strong>{relations.countries_with_shared_coverage}</strong>
+                    <small>Countries appearing alongside at least one other country</small>
+                  </div>
+                  <div className="regional-stat">
+                    <span>COUNTRY PAIRS IDENTIFIED</span>
+                    <strong>{relations.total_pairs}</strong>
+                    <small>Distinct pairs found in shared articles</small>
+                  </div>
+                  <div className="regional-stat">
+                    <span>ARTICLES WITH MULTIPLE COUNTRIES</span>
+                    <strong>{relations.articles_with_multiple_countries}</strong>
+                    <small>Articles containing two or more recognised countries</small>
+                  </div>
+                </div>
+
+                <div className="relationship-workspace">
+                  <div className="regional-panel relationship-directory">
+                    <div className="regional-panel-heading">
+                      <h3>Most-covered country pairs</h3>
+                      <span>Top {relations.pairs.length}</span>
+                    </div>
+                    {relations.pairs.map((pair) => {
+                      const isSelected = selectedPair?.country_a === pair.country_a &&
+                        selectedPair?.country_b === pair.country_b
+                      return (
+                        <button
+                          type="button"
+                          key={`${pair.country_a}|${pair.country_b}`}
+                          className={`relationship-pair ${isSelected ? 'selected' : ''}`}
+                          onClick={() => setSelectedPair({
+                            country_a: pair.country_a,
+                            country_b: pair.country_b,
+                          })}
+                        >
+                          <span className="relationship-pair-names">
+                            <strong>{pair.country_a}</strong>
+                            <span>↔</span>
+                            <strong>{pair.country_b}</strong>
+                          </span>
+                          <span className="relationship-pair-meta">
+                            {pair.article_count} shared articles · {pair.topic_count} topics
+                          </span>
+                        </button>
+                      )
+                    })}
+                    {!relations.pairs.length && (
+                      <p className="regional-empty">
+                        No articles currently mention more than one recognised country.
+                      </p>
+                    )}
+                  </div>
+
+                  <div className="regional-panel relationship-profile">
+                    {loadingPair && (
+                      <div className="regional-status">Loading country-pair analysis...</div>
+                    )}
+                    {!loadingPair && relationError && (
+                      <div className="regional-status regional-error">{relationError}</div>
+                    )}
+                    {!loadingPair && pairDetails && (
+                      <>
+                        <span className="section-kicker">SHARED COVERAGE PROFILE</span>
+                        <h3 className="relationship-profile-title">
+                          {pairDetails.country_a} <span>↔</span> {pairDetails.country_b}
+                        </h3>
+                        <p className="relationship-description">
+                          These countries were both identified in the articles below.
+                          This indicates shared news coverage, not necessarily a direct
+                          political, diplomatic, or security relationship.
+                        </p>
+                        <div className="regional-detail-stats relationship-detail-stats">
+                          <div><span>SHARED ARTICLES</span><strong>{pairDetails.article_count}</strong></div>
+                          <div><span>TOPICS</span><strong>{pairDetails.topic_count}</strong></div>
+                          <div><span>SOURCES</span><strong>{pairDetails.source_count}</strong></div>
+                        </div>
+
+                        <h4 className="relationship-subheading">Shared topic distribution</h4>
+                        {pairDetails.topics.map((item) => (
+                          <div className="regional-ranking-row" key={item.topic}>
+                            <span>{item.topic}</span>
+                            <span className="relationship-topic-count">
+                              {item.article_count} articles
+                            </span>
+                          </div>
+                        ))}
+
+                        <h4 className="relationship-subheading">News sources</h4>
+                        <div className="regional-source-list">
+                          {pairDetails.sources.map((item) => (
+                            <div className="regional-source-item" key={item.source}>
+                              <span>{item.source}</span>
+                              <strong>{item.article_count} articles</strong>
+                            </div>
+                          ))}
+                        </div>
+
+                        <h4 className="relationship-subheading">Articles mentioning both countries</h4>
+                        {pairDetails.articles.map((article) => (
+                          <article className="regional-article" key={article.id}>
+                            <div className="regional-article-meta">
+                              <span>{article.source || 'Unknown source'}</span>
+                              <time>{formatDate(article.published)}</time>
+                            </div>
+                            <h4>{article.title}</h4>
+                            <div className="regional-article-tags">
+                              {article.topics?.split(',').filter(Boolean).map((topic) => (
+                                <span className="topic" key={topic}>{topic.trim()}</span>
+                              ))}
+                            </div>
+                            {article.link && (
+                              <a href={article.link} target="_blank" rel="noreferrer">
+                                Read original report ↗
+                              </a>
+                            )}
+                          </article>
+                        ))}
+                      </>
+                    )}
+                    {!loadingPair && !pairDetails && !relationError && (
+                      <p className="regional-empty">Select a country pair to inspect its shared coverage.</p>
+                    )}
+                  </div>
+                </div>
+              </>
+            )}
+            <p className="regional-data-note">
+              METHODOLOGY — A pair is counted once per article when both country names
+              appear in that article's recognised country list. Co-mention is not proof
+              of cooperation, conflict, or a formal relationship.
+            </p>
+          </section>
+
           <p className="regional-data-note">
             DATA NOTE — Regional totals reflect the current STATECRAFT MONITOR database
             and country-recognition results. They are not a measure of total real-world
