@@ -7,6 +7,7 @@ const pageNames = {
   '/world-news': 'WORLD NEWS',
   '/countries': 'REGIONS & COUNTRIES',
   '/intelligence': 'INTELLIGENCE',
+  '/trends': 'GEOPOLITICAL TRENDS',
   '/research': 'RESEARCH',
   '/reports': 'REPORTS & BRIEFINGS',
 }
