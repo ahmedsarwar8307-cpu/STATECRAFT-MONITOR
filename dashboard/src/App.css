@@ -2466,3 +2466,152 @@
     padding: 14px;
   }
 }
+
+
+/* COUNTRY-TO-COUNTRY SHARED COVERAGE */
+.relationship-overview {
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  margin-top: 18px;
+  margin-bottom: 18px;
+}
+
+.relationship-workspace {
+  display: grid;
+  grid-template-columns: minmax(260px, 0.85fr) minmax(0, 1.5fr);
+  align-items: start;
+  gap: 13px;
+}
+
+.relationship-directory,
+.relationship-profile {
+  min-width: 0;
+  margin-bottom: 0;
+}
+
+.relationship-directory {
+  max-height: 760px;
+  overflow-y: auto;
+}
+
+.relationship-pair {
+  width: 100%;
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 8px;
+  padding: 14px 10px;
+  border: 0;
+  border-top: 1px solid var(--border);
+  background: transparent;
+  color: var(--text-primary);
+  text-align: left;
+  font-family: inherit;
+  cursor: pointer;
+  transition: background 150ms ease;
+}
+
+.relationship-pair:hover,
+.relationship-pair.selected {
+  background: var(--bg-main);
+}
+
+.relationship-pair.selected {
+  box-shadow: inset 3px 0 var(--accent);
+}
+
+.relationship-pair-names {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 7px;
+}
+
+.relationship-pair-names strong {
+  font-size: 13px;
+  font-weight: 600;
+}
+
+.relationship-pair-names > span {
+  color: var(--accent-light);
+  font-size: 15px;
+}
+
+.relationship-pair-meta {
+  color: var(--text-muted);
+  font-size: 11px;
+}
+
+.relationship-profile-title {
+  margin: 10px 0 0;
+  color: var(--text-primary);
+  font-family: 'Playfair Display', serif;
+  font-size: 25px;
+  font-weight: 500;
+  line-height: 1.4;
+  overflow-wrap: anywhere;
+}
+
+.relationship-profile-title span {
+  color: var(--accent-light);
+}
+
+.relationship-description {
+  margin: 9px 0 18px;
+  color: var(--text-secondary);
+  font-size: 12px;
+  line-height: 1.7;
+}
+
+.relationship-detail-stats {
+  margin: 16px 0 22px;
+}
+
+.relationship-detail-stats > div {
+  min-width: 0;
+}
+
+.relationship-subheading {
+  margin: 23px 0 10px;
+  color: var(--text-primary);
+  font-family: 'Playfair Display', serif;
+  font-size: 17px;
+  font-weight: 500;
+}
+
+.relationship-topic-count {
+  grid-column: 2 / 4;
+  color: var(--accent-light);
+  text-align: right;
+  font-size: 11px;
+  font-weight: 600;
+}
+
+@media (max-width: 900px) {
+  .relationship-workspace {
+    grid-template-columns: 1fr;
+  }
+
+  .relationship-directory {
+    max-height: 420px;
+  }
+}
+
+@media (max-width: 760px) {
+  .relationship-overview {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+
+  .relationship-profile {
+    padding: 15px;
+  }
+}
+
+@media (max-width: 420px) {
+  .relationship-overview {
+    grid-template-columns: 1fr;
+  }
+
+  .relationship-profile-title {
+    font-size: 21px;
+  }
+}
