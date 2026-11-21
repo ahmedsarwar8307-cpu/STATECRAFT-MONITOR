@@ -10,6 +10,7 @@ import Intelligence from './pages/Intelligence'
 import Research from './pages/Research'
 import Reports from './pages/Reports'
 import Trends from './pages/Trends'
+import Events from './pages/Events'
 
 import './App.css'
 
@@ -22,6 +23,7 @@ function App() {
         <Route path="/countries" element={<Countries />} />
         <Route path="/intelligence" element={<Intelligence />} />
         <Route path="/trends" element={<Trends />} />
+        <Route path="/events" element={<Events />} />
         <Route path="/research" element={<Research />} />
         <Route path="/reports" element={<Reports />} />
 
