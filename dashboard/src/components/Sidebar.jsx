@@ -5,6 +5,7 @@ import {
   Newspaper,
   Globe2,
   Crosshair,
+  TrendingUp,
   Search,
   FileText,
 } from 'lucide-react'
@@ -14,6 +15,7 @@ const navigation = [
   { name: 'World News', path: '/world-news', icon: Newspaper },
   { name: 'Regions & Countries', path: '/countries', icon: Globe2 },
   { name: 'Intelligence', path: '/intelligence', icon: Crosshair },
+  { name: 'Geopolitical Trends', path: '/trends', icon: TrendingUp },
   { name: 'Research', path: '/research', icon: Search },
   { name: 'Reports & Briefings', path: '/reports', icon: FileText },
 ]
