@@ -267,6 +267,83 @@ def build_region_summary(region_name, matching_articles):
     }
 
 
+def build_country_relationships(articles):
+    """Count unique article co-mentions for every country pair."""
+    pair_articles = {}
+    country_counts = Counter()
+    multi_country_article_count = 0
+
+    for article in articles:
+        countries = sorted({
+            country.strip()
+            for country in parse_field(article.get("countries"))
+            if country.strip() and country.casefold() != "unknown"
+        }, key=str.casefold)
+
+        if len(countries) < 2:
+            continue
+
+        multi_country_article_count += 1
+        country_counts.update(countries)
+
+        for index, country_a in enumerate(countries):
+            for country_b in countries[index + 1:]:
+                pair_key = (country_a, country_b)
+                if pair_key not in pair_articles:
+                    pair_articles[pair_key] = {
+                        "articles": [],
+                        "topics": Counter(),
+                        "sources": Counter(),
+                    }
+
+                pair_data = pair_articles[pair_key]
+                pair_data["articles"].append(article)
+                pair_data["topics"].update(set(parse_field(article.get("topics"))))
+
+                source = article.get("source")
+                if source:
+                    pair_data["sources"][source] += 1
+
+    pairs = []
+    for (country_a, country_b), data in pair_articles.items():
+        pairs.append({
+            "country_a": country_a,
+            "country_b": country_b,
+            "article_count": len(data["articles"]),
+            "topic_count": len(data["topics"]),
+            "source_count": len(data["sources"]),
+            "top_topics": [
+                {"topic": topic, "article_count": count}
+                for topic, count in data["topics"].most_common(5)
+            ],
+            "top_sources": [
+                {"source": source, "article_count": count}
+                for source, count in data["sources"].most_common(5)
+            ],
+        })
+
+    pairs.sort(
+        key=lambda item: (
+            item["article_count"],
+            item["country_a"].casefold(),
+            item["country_b"].casefold(),
+        ),
+        reverse=True,
+    )
+
+    return {
+        "country_count": len(country_counts),
+        "countries_with_shared_coverage": len({
+            country
+            for pair in pair_articles
+            for country in pair
+        }),
+        "articles_with_multiple_countries": multi_country_article_count,
+        "total_pairs": len(pairs),
+        "pairs": pairs,
+    }
+
+
 # API homepage
 @app.get("/")
 def home():
@@ -382,6 +459,85 @@ def get_region_details(region: str):
     return {
         **build_region_summary(matched_region, matching_articles),
         "database_article_count": len(articles),
+        "articles": matching_articles,
+    }
+
+
+# Country-to-country shared news coverage
+@app.get("/api/country-relations")
+def get_country_relations(
+    limit: int = Query(default=50, ge=1, le=200),
+    min_articles: int = Query(default=1, ge=1),
+):
+    articles = get_all_articles()
+    analysis = build_country_relationships(articles)
+    filtered_pairs = [
+        pair for pair in analysis["pairs"]
+        if pair["article_count"] >= min_articles
+    ]
+
+    return {
+        "country_count": analysis["country_count"],
+        "countries_with_shared_coverage": analysis["countries_with_shared_coverage"],
+        "articles_with_multiple_countries": analysis["articles_with_multiple_countries"],
+        "total_pairs": len(filtered_pairs),
+        "pairs": filtered_pairs[:limit],
+    }
+
+
+@app.get("/api/country-relations/pair")
+def get_country_relation_details(
+    country_a: str,
+    country_b: str,
+):
+    if country_a.casefold() == country_b.casefold():
+        raise HTTPException(
+            status_code=400,
+            detail="Choose two different countries.",
+        )
+
+    articles = get_all_articles()
+    matching_articles = []
+
+    for article in articles:
+        article_countries = {
+            country.casefold()
+            for country in parse_field(article.get("countries"))
+            if country.casefold() != "unknown"
+        }
+
+        if country_a.casefold() in article_countries and country_b.casefold() in article_countries:
+            matching_articles.append(article)
+
+    if not matching_articles:
+        raise HTTPException(
+            status_code=404,
+            detail=f"No shared coverage found for {country_a} and {country_b}.",
+        )
+
+    topic_counts = Counter()
+    source_counts = Counter()
+
+    for article in matching_articles:
+        topic_counts.update(set(parse_field(article.get("topics"))))
+        source = article.get("source")
+        if source:
+            source_counts[source] += 1
+
+    return {
+        "country_a": country_a,
+        "country_b": country_b,
+        "article_count": len(matching_articles),
+        "topic_count": len(topic_counts),
+        "source_count": len(source_counts),
+        "topics": [
+            {"topic": topic, "article_count": count}
+            for topic, count in topic_counts.most_common()
+        ],
+        "sources": [
+            {"source": source, "article_count": count}
+            for source, count in source_counts.most_common()
+        ],
         "articles": matching_articles,
     }
 
