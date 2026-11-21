@@ -352,7 +352,7 @@ function Countries() {
                                 }}
                               />
                             </div>
-                            <time>{formatDate(item.date).replace(/\\s\\d{4}$/, "")}</time>
+                            <time>{formatDate(item.date).replace(/\s\d{4}$/, "")}</time>
                           </div>
                         ))}
                       </div>
