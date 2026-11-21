@@ -184,6 +184,10 @@ function Intelligence() {
                 <div className="regional-status">Loading {selectedRegion} analysis...</div>
               )}
 
+              {!loadingDetails && error && (
+                <div className="regional-status regional-error">{error}</div>
+              )}
+
               {!loadingDetails && details && (
                 <>
                   <div className="regional-detail-header">
