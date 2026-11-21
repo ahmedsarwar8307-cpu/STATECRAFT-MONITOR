@@ -296,10 +296,29 @@ function Countries() {
                   </div>
 
 
-                  {/* Selected country statistics */}
-                  <div className="country-detail-stat">
-                    <span>ARTICLES IN DATABASE</span>
-                    <strong>{countryDetails.article_count}</strong>
+                  {/* Selected country coverage metrics */}
+                  <div className="country-profile-stats">
+                    <div className="country-profile-stat">
+                      <span>ARTICLES COVERED</span>
+                      <strong>{countryDetails.article_count}</strong>
+                    </div>
+
+                    <div className="country-profile-stat">
+                      <span>NEWS SOURCES</span>
+                      <strong>{countryDetails.source_count}</strong>
+                    </div>
+
+                    <div className="country-profile-stat">
+                      <span>TOPICS COVERED</span>
+                      <strong>{countryDetails.topic_count}</strong>
+                    </div>
+
+                    <div className="country-profile-stat">
+                      <span>LATEST COVERAGE</span>
+                      <strong className="country-profile-date">
+                        {formatDate(countryDetails.latest_coverage)}
+                      </strong>
+                    </div>
                   </div>
 
 
