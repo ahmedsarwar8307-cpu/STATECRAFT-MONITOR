@@ -134,11 +134,6 @@ function Intelligence() {
               <strong>{overview.regions_with_coverage}</strong>
               <small>At least one matching article</small>
             </div>
-            <div className="regional-stat">
-              <span>DATABASE ARTICLES</span>
-              <strong>{overview.total_database_articles}</strong>
-              <small>All retained database records</small>
-            </div>
           </div>
 
           <div className="regional-section-heading">
