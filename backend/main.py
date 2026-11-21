@@ -2,6 +2,8 @@
 from pathlib import Path
 import sqlite3
 from collections import Counter
+from datetime import datetime, timezone
+from email.utils import parsedate_to_datetime
 
 from fastapi import FastAPI, HTTPException, Query
 from fastapi.middleware.cors import CORSMiddleware
@@ -57,6 +59,26 @@ def parse_field(value):
         if item.strip()
     ]
 
+def get_published_timestamp(value):
+    if not value:
+        return float("-inf")
+
+    try:
+        published_date = parsedate_to_datetime(value)
+    except (TypeError, ValueError, OverflowError):
+        try:
+            published_date = datetime.fromisoformat(
+                value.replace("Z", "+00:00")
+            )
+        except (TypeError, ValueError, OverflowError):
+            return float("-inf")
+
+    if published_date.tzinfo is None:
+        published_date = published_date.replace(tzinfo=timezone.utc)
+
+    return published_date.timestamp()
+
+
 
 # Retrieve articles from the database
 def get_all_articles():
@@ -73,7 +95,17 @@ def get_all_articles():
             """
         ).fetchall()
 
-        return [dict(row) for row in rows]
+        articles = [dict(row) for row in rows]
+
+        articles.sort(
+            key=lambda article: (
+                get_published_timestamp(article.get("published")),
+                article.get("id", 0),
+            ),
+            reverse=True,
+        )
+
+        return articles
 
     finally:
         connection.close()
