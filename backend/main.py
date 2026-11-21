@@ -468,6 +468,196 @@ def build_coverage_trends(articles, window_days=7):
     }
 
 
+
+EVENT_TITLE_STOPWORDS = {
+    "about", "after", "against", "amid", "among", "and", "are", "been",
+    "before", "between", "from", "have", "into", "over", "says", "said",
+    "that", "their", "there", "these", "this", "through", "under", "with",
+    "will", "would", "what", "when", "where", "while", "whose", "could",
+    "should", "report", "reports", "latest", "live", "update", "updates",
+    "news", "more", "than", "they", "them", "then", "also", "after",
+    "first", "next", "amid", "during", "such", "its", "his", "her",
+}
+
+
+def event_title_tokens(title):
+    import re
+
+    words = re.findall(r"[a-z0-9]{3,}", (title or "").casefold())
+    return {
+        word for word in words
+        if word not in EVENT_TITLE_STOPWORDS and not word.isdigit()
+    }
+
+
+def build_event_clusters(articles, window_days=30, min_articles=2):
+    """Group likely reports of the same event using title, topic, country and date overlap."""
+    dated = []
+    for article in articles:
+        published_date = get_published_date(article.get("published"))
+        if published_date:
+            dated.append((date.fromisoformat(published_date), article))
+
+    if not dated:
+        return {
+            "available": False,
+            "message": "No valid publication dates are available for event clustering.",
+            "latest_data_date": None,
+            "articles_analysed": 0,
+            "cluster_count": 0,
+            "clustered_article_count": 0,
+            "unclustered_article_count": 0,
+            "clusters": [],
+        }
+
+    latest_date = max(item[0] for item in dated)
+    start_date = latest_date - timedelta(days=window_days - 1)
+    selected = [
+        article for published_date, article in dated
+        if start_date <= published_date <= latest_date
+    ]
+    selected.sort(
+        key=lambda article: get_published_timestamp(article.get("published")),
+        reverse=True,
+    )
+
+    prepared = []
+    for article in selected:
+        prepared.append({
+            "article": article,
+            "date": date.fromisoformat(get_published_date(article.get("published"))),
+            "tokens": event_title_tokens(article.get("title")),
+            "countries": {
+                value.casefold() for value in parse_field(article.get("countries"))
+                if value.casefold() != "unknown"
+            },
+            "topics": {
+                value.casefold() for value in parse_field(article.get("topics"))
+            },
+        })
+
+    parent = list(range(len(prepared)))
+
+    def find(index):
+        while parent[index] != index:
+            parent[index] = parent[parent[index]]
+            index = parent[index]
+        return index
+
+    def union(left, right):
+        root_left, root_right = find(left), find(right)
+        if root_left != root_right:
+            parent[root_right] = root_left
+
+    for left in range(len(prepared)):
+        first = prepared[left]
+        if len(first["tokens"]) < 2:
+            continue
+
+        for right in range(left + 1, len(prepared)):
+            second = prepared[right]
+            day_gap = abs((first["date"] - second["date"]).days)
+            if day_gap > 10:
+                continue
+
+            shared_tokens = first["tokens"].intersection(second["tokens"])
+            if len(shared_tokens) < 2:
+                continue
+
+            shared_context = bool(
+                first["countries"].intersection(second["countries"])
+                or first["topics"].intersection(second["topics"])
+            )
+            if not shared_context:
+                continue
+
+            title_similarity = len(shared_tokens) / max(
+                1, min(len(first["tokens"]), len(second["tokens"]))
+            )
+            if title_similarity >= 0.34:
+                union(left, right)
+
+    components = {}
+    for index in range(len(prepared)):
+        components.setdefault(find(index), []).append(prepared[index])
+
+    clusters = []
+    clustered_ids = set()
+
+    for members in components.values():
+        if len(members) < min_articles:
+            continue
+
+        member_articles = [item["article"] for item in members]
+        clustered_ids.update(article["id"] for article in member_articles)
+
+        country_counts = Counter()
+        topic_counts = Counter()
+        source_counts = Counter()
+        for article in member_articles:
+            country_counts.update(set(
+                value for value in parse_field(article.get("countries"))
+                if value.casefold() != "unknown"
+            ))
+            topic_counts.update(set(parse_field(article.get("topics"))))
+            if article.get("source"):
+                source_counts[article["source"]] += 1
+
+        dates = [item["date"] for item in members]
+        clusters.append({
+            "cluster_id": min(article["id"] for article in member_articles),
+            "headline": member_articles[0].get("title") or "Untitled event",
+            "article_count": len(member_articles),
+            "first_seen": min(dates).isoformat(),
+            "latest_seen": max(dates).isoformat(),
+            "countries": [
+                {"name": name, "article_count": count}
+                for name, count in country_counts.most_common(8)
+            ],
+            "topics": [
+                {"name": name, "article_count": count}
+                for name, count in topic_counts.most_common(6)
+            ],
+            "sources": [
+                {"name": name, "article_count": count}
+                for name, count in source_counts.most_common()
+            ],
+            "articles": member_articles,
+        })
+
+    clusters.sort(
+        key=lambda item: (
+            item["article_count"],
+            item["latest_seen"],
+        ),
+        reverse=True,
+    )
+
+    return {
+        "available": True,
+        "window_days": window_days,
+        "latest_data_date": latest_date.isoformat(),
+        "window_start": start_date.isoformat(),
+        "articles_analysed": len(selected),
+        "cluster_count": len(clusters),
+        "clustered_article_count": len(clustered_ids),
+        "unclustered_article_count": len(selected) - len(clustered_ids),
+        "clusters": clusters,
+    }
+
+
+@app.get("/api/events")
+def get_event_clusters(
+    days: int = Query(default=30, ge=7, le=90),
+    min_articles: int = Query(default=2, ge=2, le=10),
+):
+    return build_event_clusters(
+        get_all_articles(),
+        window_days=days,
+        min_articles=min_articles,
+    )
+
+
 # API homepage
 @app.get("/")
 def home():
