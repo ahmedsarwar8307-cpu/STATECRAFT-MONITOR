@@ -1511,3 +1511,98 @@
     font-size: 21px;
   }
 }
+
+
+
+/* COUNTRY COVERAGE TIMELINE */
+
+.country-timeline {
+  margin: 22px 0 28px;
+  padding: 19px;
+  border: 1px solid var(--border);
+  background: var(--bg-main);
+}
+
+.country-timeline-heading {
+  display: flex;
+  align-items: end;
+  justify-content: space-between;
+  gap: 12px;
+  margin-bottom: 22px;
+}
+
+.country-timeline-heading h3 {
+  margin: 7px 0 0;
+  color: var(--text-primary);
+  font-family: 'Playfair Display', serif;
+  font-size: 19px;
+  font-weight: 500;
+}
+
+.country-timeline-heading > span {
+  color: var(--text-muted);
+  font-size: 9px;
+}
+
+.country-timeline-chart {
+  min-height: 190px;
+  display: flex;
+  align-items: stretch;
+  gap: 8px;
+  overflow-x: auto;
+  padding: 10px 2px 0;
+}
+
+.country-timeline-column {
+  min-width: 42px;
+  flex: 1 0 42px;
+  display: grid;
+  grid-template-rows: 16px minmax(100px, 1fr) 28px;
+  justify-items: center;
+  gap: 7px;
+}
+
+.country-timeline-value {
+  color: var(--text-secondary);
+  font-size: 10px;
+  font-variant-numeric: tabular-nums;
+}
+
+.country-timeline-bar-track {
+  width: 100%;
+  max-width: 34px;
+  height: 100%;
+  display: flex;
+  align-items: end;
+  background: #172332;
+  border-bottom: 1px solid var(--border);
+}
+
+.country-timeline-bar {
+  width: 100%;
+  min-height: 3px;
+  background: var(--accent);
+  transition: height 180ms ease;
+}
+
+.country-timeline-column time {
+  color: var(--text-muted);
+  font-size: 8px;
+  white-space: nowrap;
+}
+
+@media (max-width: 500px) {
+  .country-timeline {
+    padding: 14px;
+  }
+
+  .country-timeline-heading {
+    align-items: flex-start;
+    flex-direction: column;
+  }
+
+  .country-timeline-column {
+    min-width: 38px;
+    flex-basis: 38px;
+  }
+}
