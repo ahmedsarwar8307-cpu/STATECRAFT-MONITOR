@@ -19,6 +19,9 @@ function Events() {
   const [selectedId, setSelectedId] = useState(null)
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState('')
+  const [watchlist, setWatchlist] = useState([])
+  const [watchlistError, setWatchlistError] = useState('')
+  const [watchlistBusy, setWatchlistBusy] = useState(false)
 
   useEffect(() => {
     let active = true
@@ -43,6 +46,47 @@ function Events() {
     loadEvents()
     return () => { active = false }
   }, [days])
+
+  useEffect(() => {
+    let active = true
+    async function loadWatchlist() {
+      try {
+        const response = await fetch(`${API_BASE}/api/events/watchlist`)
+        if (!response.ok) throw new Error('Unable to load tracked events.')
+        const result = await response.json()
+        if (active) setWatchlist(result.events || [])
+      } catch (loadError) {
+        if (active) setWatchlistError(loadError.message)
+      }
+    }
+    loadWatchlist()
+    return () => { active = false }
+  }, [])
+
+  async function toggleTrackedEvent() {
+    if (!selectedCluster || watchlistBusy) return
+    setWatchlistBusy(true)
+    setWatchlistError('')
+    const isTracked = watchlist.some((item) => item.cluster_id === selectedCluster.cluster_id)
+    try {
+      const response = await fetch(
+        `${API_BASE}/api/events/watchlist?cluster_id=${selectedCluster.cluster_id}`,
+        { method: isTracked ? 'DELETE' : 'POST' }
+      )
+      if (!response.ok) {
+        const result = await response.json()
+        throw new Error(result.detail || 'Unable to update event watchlist.')
+      }
+      const result = await fetch(`${API_BASE}/api/events/watchlist`)
+      if (!result.ok) throw new Error('Event updated, but watchlist could not refresh.')
+      const refreshed = await result.json()
+      setWatchlist(refreshed.events || [])
+    } catch (loadError) {
+      setWatchlistError(loadError.message)
+    } finally {
+      setWatchlistBusy(false)
+    }
+  }
 
   const selectedCluster = data?.clusters?.find(
     (cluster) => cluster.cluster_id === selectedId
@@ -89,6 +133,38 @@ function Events() {
       {!loading && data && !data.available && (
         <div className="regional-status">{data.message}</div>
       )}
+
+      <section className="regional-panel event-watchlist">
+        <div className="regional-panel-heading">
+          <div>
+            <span className="section-kicker">ANALYST WORKSPACE</span>
+            <h3>Tracked events</h3>
+          </div>
+          <span>{watchlist.length} saved</span>
+        </div>
+        {watchlistError && <p className="regional-status regional-error">{watchlistError}</p>}
+        {watchlist.length ? (
+          <div className="event-watchlist-list">
+            {watchlist.map((item) => (
+              <div className="event-watchlist-item" key={item.cluster_id}>
+                <div>
+                  <strong>{item.headline}</strong>
+                  <span>
+                    {item.currently_detected
+                      ? `${item.article_count} reports · latest ${formatDate(item.latest_seen)}`
+                      : 'Not present in the latest 90-day detection window'}
+                  </span>
+                </div>
+                <span className={item.currently_detected ? 'event-watch-status active' : 'event-watch-status'}>
+                  {item.currently_detected ? 'IN CURRENT DATA' : 'NOT RECENTLY DETECTED'}
+                </span>
+              </div>
+            ))}
+          </div>
+        ) : (
+          <p className="regional-empty">No tracked events yet. Select an event below and add it to your watchlist.</p>
+        )}
+      </section>
 
       {!loading && data?.available && (
         <>
@@ -161,6 +237,14 @@ function Events() {
                 <>
                   <span className="section-kicker">EVENT INTELLIGENCE PROFILE</span>
                   <h2>{selectedCluster.headline}</h2>
+                  <button
+                    type="button"
+                    className="event-track-button"
+                    onClick={toggleTrackedEvent}
+                    disabled={watchlistBusy}
+                  >
+                    {watchlistBusy ? 'UPDATING WATCHLIST…' : watchlist.some((item) => item.cluster_id === selectedCluster.cluster_id) ? 'REMOVE FROM WATCHLIST' : '＋ TRACK THIS EVENT'}
+                  </button>
                   <p className="event-profile-summary">
                     This group contains {selectedCluster.article_count} reports
                     published between {formatDate(selectedCluster.first_seen)} and
