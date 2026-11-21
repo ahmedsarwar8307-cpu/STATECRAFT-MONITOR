@@ -1606,3 +1606,313 @@
     flex-basis: 38px;
   }
 }
+
+
+
+/* READABILITY AND PAGE-SPECIFIC VISUAL THEMES */
+
+/* Keep the navigation rail dark in both visual environments. */
+.app-shell .sidebar {
+  --bg-sidebar: #0e1621;
+  --text-primary: #f0f3f7;
+  --text-secondary: #c0cad6;
+  --text-muted: #9aa9ba;
+  --border: #2a394b;
+}
+
+/* Editorial pages use a warm, paper-like reading surface. */
+.theme-editorial {
+  --bg-main: #f4f0e7;
+  --bg-card: #fffdf8;
+  --bg-card-hover: #eee8dc;
+  --border: #ded6c8;
+  --text-primary: #252a30;
+  --text-secondary: #454d56;
+  --text-muted: #68717a;
+  --accent: #967344;
+  --accent-light: #785a30;
+  background: var(--bg-main);
+  color: var(--text-primary);
+}
+
+.theme-editorial .main-content {
+  background: var(--bg-main);
+}
+
+.theme-editorial .topbar {
+  border-color: var(--border);
+}
+
+.theme-editorial .breadcrumb,
+.theme-editorial .edition {
+  color: var(--text-secondary);
+}
+
+.theme-editorial .breadcrumb span {
+  color: var(--accent);
+}
+
+.theme-editorial .icon-button {
+  border-color: var(--border);
+  color: var(--text-secondary);
+}
+
+.theme-editorial .icon-button:hover {
+  color: var(--text-primary);
+  border-color: var(--accent);
+}
+
+.theme-editorial .page-section h1,
+.theme-editorial .section-heading h2,
+.theme-editorial .featured-copy h2,
+.theme-editorial .news-card h3,
+.theme-editorial .country-articles-heading h3 {
+  color: var(--text-primary);
+}
+
+.theme-editorial .page-section > p,
+.theme-editorial .welcome-section p,
+.theme-editorial .featured-copy p,
+.theme-editorial .empty-state p {
+  color: var(--text-secondary);
+  font-size: 15px;
+  line-height: 1.8;
+}
+
+.theme-editorial .section-kicker,
+.theme-editorial .section-meta,
+.theme-editorial .news-count,
+.theme-editorial .news-date {
+  color: #626b75;
+}
+
+.theme-editorial .news-card,
+.theme-editorial .empty-state,
+.theme-editorial .featured-card,
+.theme-editorial .intelligence-panel {
+  background: var(--bg-card);
+  border-color: var(--border);
+}
+
+.theme-editorial .news-card {
+  padding: 25px;
+}
+
+.theme-editorial .news-card h3 {
+  font-size: 20px;
+  line-height: 1.55;
+}
+
+.theme-editorial .news-source,
+.theme-editorial .news-read-link,
+.theme-editorial .story-category,
+.theme-editorial .view-all {
+  color: var(--accent-light);
+}
+
+.theme-editorial .news-date {
+  font-size: 12px;
+}
+
+.theme-editorial .news-tag {
+  border-color: #d8cfbf;
+  color: #4d5660;
+  background: #f6f1e7;
+  font-size: 11px;
+  padding: 6px 9px;
+}
+
+.theme-editorial .topic-tag {
+  color: #765a31;
+  border-color: #d5c19e;
+  background: #f2eadb;
+}
+
+.theme-editorial .news-search,
+.theme-editorial .news-filter-row select,
+.theme-editorial .news-reset,
+.theme-editorial .pagination-button {
+  background: #fffdf8;
+  border-color: #d7cebf;
+  color: #414a54;
+}
+
+.theme-editorial .news-search input {
+  color: #252a30;
+  font-size: 14px;
+}
+
+.theme-editorial .news-search input::placeholder {
+  color: #747d86;
+}
+
+.theme-editorial .news-filter-row select {
+  font-size: 13px;
+}
+
+.theme-editorial .pagination-info,
+.theme-editorial .section-meta {
+  color: #59636e;
+}
+
+.theme-editorial .pagination-button:hover:not(:disabled),
+.theme-editorial .news-reset:hover {
+  background: #eee7da;
+  color: #252a30;
+}
+
+.theme-editorial .footer {
+  border-color: var(--border);
+  color: #626b75;
+}
+
+.theme-editorial .welcome-section {
+  border-color: var(--border);
+}
+
+.theme-editorial .welcome-section h1,
+.theme-editorial .featured-copy h2,
+.theme-editorial .section-heading h2 {
+  color: #252a30;
+}
+
+.theme-editorial .date-panel {
+  background: linear-gradient(90deg, #96734412, transparent);
+}
+
+.theme-editorial .date-panel span,
+.theme-editorial .date-panel small {
+  color: #68717a;
+}
+
+.theme-editorial .date-panel strong {
+  color: #785a30;
+}
+
+.theme-editorial .intelligence-panel h2,
+.theme-editorial .tool-item strong {
+  color: #252a30;
+}
+
+.theme-editorial .tool-item {
+  border-color: var(--border);
+}
+
+.theme-editorial .tool-item small,
+.theme-editorial .panel-footer {
+  color: #68717a;
+}
+
+/* Dark intelligence pages retain the existing visual identity, with stronger legibility. */
+.theme-intelligence {
+  --text-primary: #f0f3f7;
+  --text-secondary: #c0cad6;
+  --text-muted: #9aa9ba;
+}
+
+.theme-intelligence .page-section > p {
+  color: var(--text-secondary);
+  font-size: 15px;
+  line-height: 1.8;
+}
+
+.theme-intelligence .section-kicker,
+.theme-intelligence .section-meta,
+.theme-intelligence .country-stat-label,
+.theme-intelligence .country-profile-stat span,
+.theme-intelligence .country-detail-stat span {
+  color: #a9b6c5;
+}
+
+.theme-intelligence .country-directory-controls,
+.theme-intelligence .country-list-item,
+.theme-intelligence .country-breakdown-row,
+.theme-intelligence .country-article-meta,
+.theme-intelligence .country-muted,
+.theme-intelligence .country-data-note {
+  color: #c0cad6;
+  font-size: 12px;
+}
+
+.theme-intelligence .country-search input,
+.theme-intelligence .country-directory-controls select {
+  font-size: 13px;
+}
+
+.theme-intelligence .country-list-item {
+  min-height: 47px;
+}
+
+.theme-intelligence .country-breakdown-row {
+  padding: 11px 0;
+}
+
+.theme-intelligence .country-article h4 {
+  font-size: 18px;
+  line-height: 1.6;
+}
+
+.theme-intelligence .country-article-meta,
+.theme-intelligence .country-articles-heading > span,
+.theme-intelligence .country-timeline-heading > span,
+.theme-intelligence .country-timeline-column time {
+  font-size: 11px;
+  color: #a9b6c5;
+}
+
+.theme-intelligence .country-timeline-value {
+  font-size: 12px;
+  color: #c0cad6;
+}
+
+.theme-intelligence .news-tag {
+  font-size: 11px;
+  padding: 6px 9px;
+}
+
+.theme-intelligence .country-reset,
+.theme-intelligence .news-read-link {
+  font-size: 12px;
+}
+
+.theme-intelligence .country-profile-stat strong {
+  font-size: 27px;
+}
+
+.theme-intelligence .country-status {
+  color: #c0cad6;
+  font-size: 14px;
+}
+
+.theme-intelligence .country-detail-header p {
+  color: #c0cad6;
+  font-size: 13px;
+  line-height: 1.8;
+}
+
+.theme-intelligence .country-breakdown-panel h3,
+.theme-intelligence .country-timeline-heading h3 {
+  font-size: 18px;
+}
+
+/* Make common small interface text easier to read on every page. */
+.nav-item {
+  font-size: 13px;
+}
+
+.nav-label,
+.breadcrumb,
+.edition {
+  font-size: 10px;
+}
+
+@media (max-width: 760px) {
+  .theme-editorial .page-section > p,
+  .theme-intelligence .page-section > p {
+    font-size: 14px;
+  }
+
+  .theme-editorial .news-card h3 {
+    font-size: 18px;
+  }
+}
