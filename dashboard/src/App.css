@@ -1451,3 +1451,63 @@
     font-size: 18px;
   }
 }
+
+
+/* COUNTRY PROFILE — COVERAGE METRICS */
+
+.country-profile-stats {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 10px;
+  margin: 20px 0 26px;
+}
+
+.country-profile-stat {
+  min-width: 0;
+  padding: 16px;
+  border: 1px solid var(--border);
+  background: var(--bg-main);
+}
+
+.country-profile-stat span,
+.country-profile-stat strong {
+  display: block;
+}
+
+.country-profile-stat span {
+  color: var(--text-muted);
+  font-size: 8px;
+  font-weight: 700;
+  letter-spacing: 0.9px;
+}
+
+.country-profile-stat strong {
+  margin-top: 12px;
+  color: var(--accent-light);
+  font-family: 'Playfair Display', serif;
+  font-size: 25px;
+  font-weight: 500;
+  overflow-wrap: anywhere;
+}
+
+.country-profile-stat .country-profile-date {
+  font-family: inherit;
+  font-size: 13px;
+  line-height: 1.5;
+}
+
+@media (max-width: 1000px) {
+  .country-profile-stats {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+}
+
+@media (max-width: 420px) {
+  .country-profile-stat {
+    padding: 12px;
+  }
+
+  .country-profile-stat strong {
+    font-size: 21px;
+  }
+}
