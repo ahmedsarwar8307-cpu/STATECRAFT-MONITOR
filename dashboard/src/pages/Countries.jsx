@@ -119,6 +119,13 @@ function Countries() {
   }, [countries, search, sortOrder]);
 
 
+  const timeline = countryDetails?.coverage_timeline || [];
+  const maxDailyCoverage = Math.max(
+    1,
+    ...timeline.map((item) => item.article_count)
+  );
+
+
   function resetSearch() {
     setSearch("");
     setSortOrder("articles");
@@ -313,6 +320,47 @@ function Countries() {
                         {formatDate(countryDetails.latest_coverage)}
                       </strong>
                     </div>
+                  </div>
+
+
+                  {/* Daily country coverage timeline */}
+                  <div className="country-timeline">
+                    <div className="country-timeline-heading">
+                      <div>
+                        <span className="section-kicker">MEDIA ATTENTION OVER TIME</span>
+                        <h3>Coverage Timeline</h3>
+                      </div>
+                      <span>{timeline.length} publication dates</span>
+                    </div>
+
+                    {timeline.length > 0 ? (
+                      <div
+                        className="country-timeline-chart"
+                        role="img"
+                        aria-label={`Daily article coverage for ${countryDetails.country}`}
+                      >
+                        {timeline.map((item) => (
+                          <div className="country-timeline-column" key={item.date}>
+                            <span className="country-timeline-value">
+                              {item.article_count}
+                            </span>
+                            <div className="country-timeline-bar-track">
+                              <div
+                                className="country-timeline-bar"
+                                style={{
+                                  height: `${(item.article_count / maxDailyCoverage) * 100}%`,
+                                }}
+                              />
+                            </div>
+                            <time>{formatDate(item.date).replace(/\\s\\d{4}$/, "")}</time>
+                          </div>
+                        ))}
+                      </div>
+                    ) : (
+                      <p className="country-muted">
+                        No publication dates are available for this country.
+                      </p>
+                    )}
                   </div>
 
 
