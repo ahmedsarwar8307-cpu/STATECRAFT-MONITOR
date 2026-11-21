@@ -1,4 +1,3 @@
-
 from pathlib import Path
 import sqlite3
 from collections import Counter
@@ -16,11 +15,75 @@ BASE_DIR = Path(__file__).resolve().parent.parent
 DATABASE_PATH = BASE_DIR / "database" / "geointel.db"
 
 
+# Regional country index. Country names must match the names stored by the
+# country-recognition pipeline. A country is assigned to one primary region.
+REGION_COUNTRIES = {
+    "South Asia": [
+        "Afghanistan", "Bangladesh", "Bhutan", "India", "Maldives",
+        "Nepal", "Pakistan", "Sri Lanka",
+    ],
+    "East Asia": [
+        "China", "Japan", "Mongolia", "North Korea", "South Korea", "Taiwan",
+    ],
+    "Southeast Asia": [
+        "Brunei", "Cambodia", "Indonesia", "Laos", "Malaysia", "Myanmar",
+        "Philippines", "Singapore", "Thailand", "Timor-Leste", "Vietnam",
+    ],
+    "Middle East": [
+        "Bahrain", "Iran", "Iraq", "Israel", "Jordan", "Kuwait", "Lebanon",
+        "Oman", "Palestine", "Qatar", "Saudi Arabia", "Syria", "Turkey",
+        "United Arab Emirates", "Yemen",
+    ],
+    "Europe": [
+        "Albania", "Andorra", "Austria", "Belarus", "Belgium",
+        "Bosnia and Herzegovina", "Bulgaria", "Croatia", "Cyprus",
+        "Czech Republic", "Denmark", "Estonia", "Finland", "France",
+        "Germany", "Greece", "Hungary", "Iceland", "Ireland", "Italy",
+        "Kosovo", "Latvia", "Liechtenstein", "Lithuania", "Luxembourg",
+        "Malta", "Moldova", "Monaco", "Montenegro", "Netherlands",
+        "North Macedonia", "Norway", "Poland", "Portugal", "Romania",
+        "Russia", "San Marino", "Serbia", "Slovakia", "Slovenia", "Spain",
+        "Sweden", "Switzerland", "Ukraine", "United Kingdom", "Vatican City",
+    ],
+    "Africa": [
+        "Algeria", "Angola", "Benin", "Botswana", "Burkina Faso", "Burundi",
+        "Cabo Verde", "Cameroon", "Central African Republic", "Chad",
+        "Comoros", "Democratic Republic of the Congo", "Djibouti", "Egypt",
+        "Equatorial Guinea", "Eritrea", "Eswatini", "Ethiopia", "Gabon",
+        "Gambia", "Ghana", "Guinea", "Guinea-Bissau", "Ivory Coast", "Kenya",
+        "Lesotho", "Liberia", "Libya", "Madagascar", "Malawi", "Mali",
+        "Mauritania", "Mauritius", "Morocco", "Mozambique", "Namibia",
+        "Niger", "Nigeria", "Republic of the Congo", "Rwanda",
+        "Sao Tome and Principe", "Senegal", "Seychelles", "Sierra Leone",
+        "Somalia", "South Africa", "South Sudan", "Sudan", "Tanzania",
+        "Togo", "Tunisia", "Uganda", "Zambia", "Zimbabwe",
+    ],
+    "North America": [
+        "Canada", "Mexico", "United States",
+    ],
+    "Latin America & Caribbean": [
+        "Antigua and Barbuda", "Argentina", "Bahamas", "Barbados", "Belize",
+        "Bolivia", "Brazil", "Chile", "Colombia", "Costa Rica", "Cuba",
+        "Dominica", "Dominican Republic", "Ecuador", "El Salvador",
+        "Grenada", "Guatemala", "Guyana", "Haiti", "Honduras", "Jamaica",
+        "Nicaragua", "Panama", "Paraguay", "Peru", "Saint Kitts and Nevis",
+        "Saint Lucia", "Saint Vincent and the Grenadines", "Suriname",
+        "Trinidad and Tobago", "Uruguay", "Venezuela",
+    ],
+    "Oceania": [
+        "Australia", "Fiji", "Kiribati", "Marshall Islands",
+        "Micronesia", "Nauru", "New Zealand", "Palau",
+        "Papua New Guinea", "Samoa", "Solomon Islands", "Tonga", "Tuvalu",
+        "Vanuatu",
+    ],
+}
+
+
 # Create the FastAPI application
 app = FastAPI(
     title="STATECRAFT MONITOR API",
     description="Backend API for geopolitical news and intelligence.",
-    version="1.0.0",
+    version="1.1.0",
 )
 
 
@@ -128,12 +191,84 @@ def get_all_articles():
         connection.close()
 
 
+def get_region_articles(articles, region_name):
+    region_countries = {
+        country.casefold()
+        for country in REGION_COUNTRIES[region_name]
+    }
+
+    matching_articles = []
+
+    for article in articles:
+        article_countries = {
+            country.casefold()
+            for country in parse_field(article.get("countries"))
+            if country.casefold() != "unknown"
+        }
+
+        matched_countries = article_countries.intersection(region_countries)
+
+        if matched_countries:
+            matching_articles.append({
+                **article,
+                "region_countries": [
+                    country for country in REGION_COUNTRIES[region_name]
+                    if country.casefold() in matched_countries
+                ],
+            })
+
+    return matching_articles
+
+
+def build_region_summary(region_name, matching_articles):
+    country_counts = Counter()
+    topic_counts = Counter()
+    source_counts = Counter()
+    coverage_counts = Counter()
+
+    for article in matching_articles:
+        country_counts.update(set(article.get("region_countries", [])))
+        topic_counts.update(set(parse_field(article.get("topics"))))
+
+        source = article.get("source")
+        if source:
+            source_counts[source] += 1
+
+        published_date = get_published_date(article.get("published"))
+        if published_date:
+            coverage_counts[published_date] += 1
+
+    return {
+        "region": region_name,
+        "article_count": len(matching_articles),
+        "country_count": len(country_counts),
+        "source_count": len(source_counts),
+        "topic_count": len(topic_counts),
+        "countries": [
+            {"country": country, "article_count": count}
+            for country, count in country_counts.most_common()
+        ],
+        "topics": [
+            {"topic": topic, "article_count": count}
+            for topic, count in topic_counts.most_common()
+        ],
+        "sources": [
+            {"source": source, "article_count": count}
+            for source, count in source_counts.most_common()
+        ],
+        "coverage_timeline": [
+            {"date": date, "article_count": count}
+            for date, count in sorted(coverage_counts.items())
+        ],
+    }
+
+
 # API homepage
 @app.get("/")
 def home():
     return {
         "message": "STATECRAFT MONITOR API is operational",
-        "version": "1.0.0",
+        "version": "1.1.0",
     }
 
 
@@ -159,7 +294,6 @@ def get_countries():
     articles_with_countries = 0
 
     for article in articles:
-        # A set ensures one article is counted only once per country
         countries = {
             country
             for country in parse_field(article.get("countries"))
@@ -187,15 +321,74 @@ def get_countries():
     }
 
 
+# Regional coverage overview
+@app.get("/api/regions")
+def get_regions():
+    articles = get_all_articles()
+    region_summaries = []
+
+    for region_name in REGION_COUNTRIES:
+        matching_articles = get_region_articles(articles, region_name)
+        summary = build_region_summary(region_name, matching_articles)
+        region_summaries.append({
+            "region": summary["region"],
+            "article_count": summary["article_count"],
+            "country_count": summary["country_count"],
+            "source_count": summary["source_count"],
+            "topic_count": summary["topic_count"],
+            "top_countries": summary["countries"][:3],
+            "top_topics": summary["topics"][:3],
+        })
+
+    region_summaries.sort(
+        key=lambda item: item["article_count"],
+        reverse=True,
+    )
+
+    return {
+        "total_database_articles": len(articles),
+        "regions_with_coverage": sum(
+            1 for region in region_summaries if region["article_count"] > 0
+        ),
+        "region_count": len(region_summaries),
+        "regions": region_summaries,
+    }
+
+
+# Detailed analysis for one region
+@app.get("/api/regions/{region}")
+def get_region_details(region: str):
+    matched_region = next(
+        (
+            name for name in REGION_COUNTRIES
+            if name.casefold() == region.casefold()
+        ),
+        None,
+    )
+
+    if not matched_region:
+        raise HTTPException(
+            status_code=404,
+            detail=f"Unknown region: {region}.",
+        )
+
+    articles = get_all_articles()
+    matching_articles = get_region_articles(articles, matched_region)
+
+    return {
+        **build_region_summary(matched_region, matching_articles),
+        "database_article_count": len(articles),
+        "articles": matching_articles,
+    }
+
+
 # Retrieve intelligence and news associated with one country
 @app.get("/api/countries/{country}")
 def get_country_details(country: str):
     articles = get_all_articles()
 
-    # Match exact country names, not partial text
     matching_articles = [
-        article
-        for article in articles
+        article for article in articles
         if any(
             item.casefold() == country.casefold()
             for item in parse_field(article.get("countries"))
@@ -208,7 +401,6 @@ def get_country_details(country: str):
             detail=f"No articles found for {country}.",
         )
 
-    # Count topics, sources, and daily coverage across matching articles
     topic_counts = Counter()
     source_counts = Counter()
     coverage_counts = Counter()
