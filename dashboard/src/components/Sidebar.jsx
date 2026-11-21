@@ -6,6 +6,7 @@ import {
   Globe2,
   Crosshair,
   TrendingUp,
+  Network,
   Search,
   FileText,
 } from 'lucide-react'
@@ -16,6 +17,7 @@ const navigation = [
   { name: 'Regions & Countries', path: '/countries', icon: Globe2 },
   { name: 'Intelligence', path: '/intelligence', icon: Crosshair },
   { name: 'Geopolitical Trends', path: '/trends', icon: TrendingUp },
+  { name: 'Event Clustering', path: '/events', icon: Network },
   { name: 'Research', path: '/research', icon: Search },
   { name: 'Reports & Briefings', path: '/reports', icon: FileText },
 ]
