@@ -24,7 +24,7 @@ function Sidebar() {
       <div className="brand">
         <div className="brand-mark">S</div>
         <div>
-          <h2>STATECRAFT</h2>
+          <h2>Statecraft</h2>
           <span>MONITOR</span>
         </div>
       </div>
