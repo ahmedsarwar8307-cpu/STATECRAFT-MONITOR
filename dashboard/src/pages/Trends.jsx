@@ -152,12 +152,12 @@ function Trends() {
             </div>
             <div className="regional-stat">
               <span>TOPICS TRACKED</span>
-              <strong>{data.topics.length}</strong>
+              <strong>{data.topic_count}</strong>
               <small>Ranked by recent coverage volume</small>
             </div>
             <div className="regional-stat">
               <span>COUNTRIES TRACKED</span>
-              <strong>{data.countries.length}</strong>
+              <strong>{data.country_count}</strong>
               <small>Ranked by recent coverage volume</small>
             </div>
           </div>
