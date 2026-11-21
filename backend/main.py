@@ -80,6 +80,23 @@ def get_published_timestamp(value):
     return published_date.timestamp()
 
 
+def get_published_date(value):
+    if not value:
+        return None
+
+    try:
+        published_date = parsedate_to_datetime(value)
+    except (TypeError, ValueError, OverflowError):
+        try:
+            published_date = datetime.fromisoformat(
+                value.replace("Z", "+00:00")
+            )
+        except (TypeError, ValueError, OverflowError):
+            return None
+
+    return published_date.date().isoformat()
+
+
 # Retrieve articles from the database
 def get_all_articles():
     connection = get_database_connection()
@@ -191,13 +208,18 @@ def get_country_details(country: str):
             detail=f"No articles found for {country}.",
         )
 
-    # Count topics and sources across matching articles
+    # Count topics, sources, and daily coverage across matching articles
     topic_counts = Counter()
     source_counts = Counter()
+    coverage_counts = Counter()
 
     for article in matching_articles:
         topics = set(parse_field(article.get("topics")))
         topic_counts.update(topics)
+
+        published_date = get_published_date(article.get("published"))
+        if published_date:
+            coverage_counts[published_date] += 1
 
         source = article.get("source")
         if source:
@@ -209,6 +231,10 @@ def get_country_details(country: str):
         "source_count": len(source_counts),
         "topic_count": len(topic_counts),
         "latest_coverage": matching_articles[0].get("published"),
+        "coverage_timeline": [
+            {"date": date, "article_count": count}
+            for date, count in sorted(coverage_counts.items())
+        ],
         "topics": [
             {"topic": topic, "article_count": count}
             for topic, count in topic_counts.most_common()
