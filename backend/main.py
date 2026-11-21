@@ -658,6 +658,100 @@ def get_event_clusters(
     )
 
 
+
+def ensure_event_watchlist_table():
+    connection = get_database_connection()
+    try:
+        connection.execute("""
+            CREATE TABLE IF NOT EXISTS tracked_events (
+                cluster_id INTEGER PRIMARY KEY,
+                headline TEXT NOT NULL,
+                tracked_at TEXT NOT NULL
+            )
+        """)
+        connection.commit()
+    finally:
+        connection.close()
+
+
+@app.get("/api/events/watchlist")
+def get_tracked_events():
+    ensure_event_watchlist_table()
+    connection = get_database_connection()
+    try:
+        rows = connection.execute(
+            "SELECT cluster_id, headline, tracked_at FROM tracked_events ORDER BY tracked_at DESC"
+        ).fetchall()
+        tracked = [dict(row) for row in rows]
+    finally:
+        connection.close()
+
+    current = build_event_clusters(get_all_articles(), window_days=90)
+    current_by_id = {
+        cluster["cluster_id"]: cluster for cluster in current.get("clusters", [])
+    }
+    results = []
+    for item in tracked:
+        cluster = current_by_id.get(item["cluster_id"])
+        results.append({
+            **item,
+            "currently_detected": cluster is not None,
+            "article_count": cluster["article_count"] if cluster else 0,
+            "latest_seen": cluster["latest_seen"] if cluster else None,
+            "headline": cluster["headline"] if cluster else item["headline"],
+        })
+    return {"tracked_count": len(results), "events": results}
+
+
+@app.post("/api/events/watchlist")
+def track_event(cluster_id: int = Query(..., ge=1)):
+    ensure_event_watchlist_table()
+    analysis = build_event_clusters(get_all_articles(), window_days=90)
+    cluster = next(
+        (item for item in analysis.get("clusters", [])
+         if item["cluster_id"] == cluster_id),
+        None,
+    )
+    if not cluster:
+        raise HTTPException(
+            status_code=404,
+            detail="This event is no longer present in the latest 90-day analysis.",
+        )
+
+    connection = get_database_connection()
+    try:
+        connection.execute(
+            """
+            INSERT INTO tracked_events (cluster_id, headline, tracked_at)
+            VALUES (?, ?, ?)
+            ON CONFLICT(cluster_id) DO UPDATE SET headline = excluded.headline
+            """,
+            (cluster_id, cluster["headline"], datetime.now(timezone.utc).isoformat()),
+        )
+        connection.commit()
+    finally:
+        connection.close()
+
+    return {"tracked": True, "cluster_id": cluster_id, "headline": cluster["headline"]}
+
+
+@app.delete("/api/events/watchlist")
+def untrack_event(cluster_id: int = Query(..., ge=1)):
+    ensure_event_watchlist_table()
+    connection = get_database_connection()
+    try:
+        cursor = connection.execute(
+            "DELETE FROM tracked_events WHERE cluster_id = ?",
+            (cluster_id,),
+        )
+        connection.commit()
+        if cursor.rowcount == 0:
+            raise HTTPException(status_code=404, detail="Tracked event not found.")
+    finally:
+        connection.close()
+    return {"tracked": False, "cluster_id": cluster_id}
+
+
 # API homepage
 @app.get("/")
 def home():
