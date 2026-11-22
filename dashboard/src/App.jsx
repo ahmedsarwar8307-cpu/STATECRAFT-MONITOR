@@ -12,6 +12,7 @@ import Reports from './pages/Reports'
 import Trends from './pages/Trends'
 import Events from './pages/Events'
 import SourceAnalysis from './pages/SourceAnalysis'
+import StrategicSignals from './pages/StrategicSignals'
 
 import './App.css'
 
@@ -26,6 +27,7 @@ function App() {
         <Route path="/trends" element={<Trends />} />
         <Route path="/events" element={<Events />} />
         <Route path="/sources" element={<SourceAnalysis />} />
+        <Route path="/signals" element={<StrategicSignals />} />
         <Route path="/research" element={<Research />} />
         <Route path="/reports" element={<Reports />} />
 
