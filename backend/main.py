@@ -1720,7 +1720,7 @@ def load_local_environment():
     env_path = BASE_DIR / ".env"
     if not env_path.exists():
         return
-    for raw_line in env_path.read_text(encoding="utf-8").splitlines():
+    for raw_line in env_path.read_text(encoding="utf-8-sig").splitlines():
         line = raw_line.strip()
         if not line or line.startswith("#") or "=" not in line:
             continue
@@ -1734,9 +1734,10 @@ def load_local_environment():
 load_local_environment()
 
 
-def build_ai_assessment_cache_key(brief):
+def build_ai_assessment_cache_key(brief, model):
     evidence_fingerprint = {
         "country": brief.get("country"),
+        "model": model,
         "period_days": brief.get("period_days"),
         "data_through": brief.get("data_through"),
         "coverage_overview": brief.get("coverage_overview"),
@@ -1853,17 +1854,17 @@ def generate_gemini_assessment(brief):
             detail="Gemini is not configured yet. Add GEMINI_API_KEY to the local .env file.",
         )
 
-    cache_key = build_ai_assessment_cache_key(brief)
+    model = (os.getenv("GEMINI_MODEL") or "gemini-3.5-flash-lite").strip()
+    cache_key = build_ai_assessment_cache_key(brief, model)
     cached = get_cached_ai_assessment(cache_key)
     if cached:
         return {
             "available": True,
             "provider": "Google Gemini",
-            "model": os.getenv("GEMINI_MODEL", "gemini-3.8-flash"),
+            "model": model,
             **cached,
         }
 
-    model = os.getenv("GEMINI_MODEL", "gemini-3.8-flash").strip()
     endpoint = (
         "https://generativelanguage.googleapis.com/v1beta/models/"
         + model
@@ -1907,6 +1908,16 @@ def generate_gemini_assessment(brief):
             status_code=502,
             detail="Gemini rejected the API key or project access. Check the key in Google AI Studio.",
         )
+    if response.status_code in (503, 504):
+        raise HTTPException(
+            status_code=503,
+            detail="Gemini is temporarily experiencing high demand or is unavailable. Your evidence-based report is still available; try AI synthesis again later.",
+        )
+    if response.status_code == 404:
+        raise HTTPException(
+            status_code=502,
+            detail=f"The configured Gemini model '{model}' was not found or is not available to this API key. Check GEMINI_MODEL in your local .env file.",
+        )
     if not response.ok:
         raise HTTPException(
             status_code=502,
@@ -1931,9 +1942,32 @@ def generate_gemini_assessment(brief):
         ):
             raise ValueError("Gemini response did not match the required assessment structure.")
         assessment = {
-            section: [str(item) for item in assessment[section][:4]]
+            section: [str(item).strip()[:1200] for item in assessment[section][:4] if str(item).strip()]
             for section in required_sections
         }
+        if any(not assessment[section] for section in required_sections):
+            raise ValueError("Gemini returned an empty assessment section.")
+
+        # Reject citations that point to article IDs outside the supplied evidence.
+        import re
+        valid_article_ids = {
+            str(item.get("id"))
+            for item in brief.get("key_headlines", [])
+            if item.get("id") is not None
+        }
+        for event in brief.get("multi_publisher_event_coverage", []):
+            valid_article_ids.update(
+                str(item.get("id"))
+                for item in event.get("articles", [])
+                if item.get("id") is not None
+            )
+        cited_ids = {
+            match for value_list in assessment.values()
+            for value in value_list
+            for match in re.findall(r"\[Article ID:\s*(\d+)\]", value, flags=re.IGNORECASE)
+        }
+        if not cited_ids.issubset(valid_article_ids):
+            raise ValueError("Gemini cited an article ID that was not supplied in the evidence.")
     except (KeyError, IndexError, TypeError, ValueError, json.JSONDecodeError):
         raise HTTPException(
             status_code=502,
