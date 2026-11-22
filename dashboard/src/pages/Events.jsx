@@ -290,6 +290,88 @@ function Events() {
                     <div><span>SOURCES</span><strong>{selectedCluster.sources.length}</strong></div>
                   </div>
 
+                  <section className="event-development">
+                    <div className="regional-panel-heading">
+                      <div>
+                        <span className="section-kicker">CHRONOLOGICAL ASSESSMENT</span>
+                        <h3>Event Development</h3>
+                      </div>
+                      <span>{selectedCluster.development?.span_days || 0} days observed</span>
+                    </div>
+                    <p className="event-development-intro">
+                      Tracks how reporting about this candidate event changes across the available articles.
+                      These are media-coverage signals, not a measure of real-world severity.
+                    </p>
+                    {selectedCluster.development?.daily_timeline?.length ? (
+                      <>
+                        <div className="event-development-summary">
+                          <div>
+                            <span>EARLIER COVERAGE</span>
+                            <strong>{selectedCluster.development.first_phase?.article_count ?? 0}</strong>
+                            <small>{formatDate(selectedCluster.development.first_phase?.start)} – {formatDate(selectedCluster.development.first_phase?.end)}</small>
+                          </div>
+                          <div>
+                            <span>LATER COVERAGE</span>
+                            <strong>{selectedCluster.development.later_phase?.article_count ?? 0}</strong>
+                            <small>
+                              {selectedCluster.development.later_phase?.start
+                                ? `${formatDate(selectedCluster.development.later_phase.start)} – ${formatDate(selectedCluster.development.later_phase.end)}`
+                                : 'No later period in the available data'}
+                            </small>
+                          </div>
+                          <div>
+                            <span>REPORTING CHANGE</span>
+                            <strong>
+                              {selectedCluster.development.reporting_change?.difference > 0 ? '+' : ''}
+                              {selectedCluster.development.reporting_change?.difference ?? 0}
+                            </strong>
+                            <small>
+                              {selectedCluster.development.reporting_change?.percent == null
+                                ? 'No earlier-period baseline'
+                                : `${selectedCluster.development.reporting_change.percent > 0 ? '+' : ''}${selectedCluster.development.reporting_change.percent}% vs earlier coverage`}
+                            </small>
+                          </div>
+                        </div>
+                        <h4 className="event-development-subheading">Daily reporting timeline</h4>
+                        <div className="event-development-chart">
+                          {selectedCluster.development.daily_timeline.map((day) => {
+                            const maximum = Math.max(1, ...selectedCluster.development.daily_timeline.map((item) => item.article_count))
+                            return (
+                              <div className="event-development-day" key={day.date} title={`${formatDate(day.date)}: ${day.article_count} reports`}>
+                                <strong>{day.article_count || ''}</strong>
+                                <div className="event-development-bar-track">
+                                  <i style={{ height: `${(day.article_count / maximum) * 100}%` }} />
+                                </div>
+                                <time>{formatDate(day.date).replace(/\s\d{4}$/, '')}</time>
+                              </div>
+                            )
+                          })}
+                        </div>
+                        <h4 className="event-development-subheading">Newly observed in later coverage</h4>
+                        <div className="event-development-changes">
+                          {[
+                            ['Countries', selectedCluster.development.newly_observed?.countries || []],
+                            ['Topics', selectedCluster.development.newly_observed?.topics || []],
+                            ['Sources', selectedCluster.development.newly_observed?.sources || []],
+                          ].map(([label, values]) => (
+                            <div className="event-development-change-group" key={label}>
+                              <strong>{label}</strong>
+                              {values.length ? (
+                                <div className="event-chip-list">
+                                  {values.map((value) => <span key={value}>{value}</span>)}
+                                </div>
+                              ) : (
+                                <small>No additional {label.toLowerCase()} observed in the later period.</small>
+                              )}
+                            </div>
+                          ))}
+                        </div>
+                      </>
+                    ) : (
+                      <p className="regional-empty">Not enough dated reports to build a development timeline.</p>
+                    )}
+                  </section>
+
                   <h3 className="relationship-subheading">Countries mentioned</h3>
                   <div className="event-chip-list">
                     {selectedCluster.countries.map((item) => (
