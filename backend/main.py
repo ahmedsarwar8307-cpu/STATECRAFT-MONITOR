@@ -885,6 +885,119 @@ def untrack_event(article_id: int = Query(..., ge=1)):
     return {"tracked": False, "article_id": article_id}
 
 
+
+# Source reliability and publisher coverage analysis
+@app.get("/api/source-health")
+def get_source_health(runs: int = Query(default=30, ge=1, le=365)):
+    history_path = BASE_DIR / "data" / "raw" / "collection_history.jsonl"
+    history = []
+    if history_path.exists():
+        with history_path.open("r", encoding="utf-8") as history_file:
+            for line in history_file:
+                try:
+                    record = json.loads(line)
+                    if isinstance(record, dict) and record.get("collected_at"):
+                        history.append(record)
+                except (json.JSONDecodeError, TypeError):
+                    continue
+
+    history.sort(key=lambda item: item.get("collected_at", ""))
+    selected_runs = history[-runs:]
+    articles = get_all_articles()
+    source_history = {}
+
+    for run in selected_runs:
+        for item in run.get("sources", []):
+            name = item.get("source")
+            if not name:
+                continue
+            entry = source_history.setdefault(name, {
+                "observations": 0, "successful_runs": 0, "failed_runs": 0,
+                "articles_collected": 0, "attempts": 0,
+                "latest_status": None, "latest_error": None,
+                "latest_collected_at": None,
+            })
+            entry["observations"] += 1
+            succeeded = item.get("status") in {"ok", "partial"}
+            entry["successful_runs"] += int(succeeded)
+            entry["failed_runs"] += int(not succeeded)
+            entry["articles_collected"] += int(item.get("accepted_articles") or 0)
+            entry["attempts"] += int(item.get("attempts") or 0)
+            entry["latest_status"] = item.get("status", "failed")
+            entry["latest_error"] = item.get("error")
+            entry["latest_collected_at"] = run.get("collected_at")
+
+    database_coverage = {}
+    for article in articles:
+        source = article.get("source")
+        if not source:
+            continue
+        item = database_coverage.setdefault(source, {
+            "database_articles": 0, "countries": Counter(), "topics": Counter()
+        })
+        item["database_articles"] += 1
+        item["countries"].update({
+            value for value in parse_field(article.get("countries"))
+            if value.casefold() != "unknown"
+        })
+        item["topics"].update(parse_field(article.get("topics")))
+
+    source_rows = []
+    for name in set(source_history) | set(database_coverage):
+        h = source_history.get(name, {})
+        c = database_coverage.get(name, {})
+        observations = h.get("observations", 0)
+        successes = h.get("successful_runs", 0)
+        source_rows.append({
+            "source": name,
+            "observations": observations,
+            "successful_runs": successes,
+            "failed_runs": h.get("failed_runs", 0),
+            "success_rate": round(successes / observations * 100, 1) if observations else None,
+            "articles_collected": h.get("articles_collected", 0),
+            "attempts": h.get("attempts", 0),
+            "latest_status": h.get("latest_status") or "not_recorded",
+            "latest_error": h.get("latest_error"),
+            "latest_collected_at": h.get("latest_collected_at"),
+            "database_articles": c.get("database_articles", 0),
+            "top_countries": [
+                {"name": key, "article_count": count}
+                for key, count in c.get("countries", Counter()).most_common(5)
+            ],
+            "top_topics": [
+                {"name": key, "article_count": count}
+                for key, count in c.get("topics", Counter()).most_common(5)
+            ],
+        })
+
+    source_rows.sort(
+        key=lambda item: (
+            item["success_rate"] is not None,
+            item["success_rate"] if item["success_rate"] is not None else -1,
+            item["database_articles"],
+        ),
+        reverse=True,
+    )
+    observations = sum(item["observations"] for item in source_rows)
+    successes = sum(item["successful_runs"] for item in source_rows)
+    return {
+        "available": bool(selected_runs),
+        "message": None if selected_runs else (
+            "No collection history has been recorded yet. Run the news collector to begin building reliability trends."
+        ),
+        "history_file_available": history_path.exists(),
+        "runs_requested": runs,
+        "runs_recorded": len(selected_runs),
+        "latest_run": selected_runs[-1] if selected_runs else None,
+        "configured_sources": selected_runs[-1].get("configured_sources", 0) if selected_runs else 0,
+        "successful_sources_latest": selected_runs[-1].get("successful_sources", 0) if selected_runs else 0,
+        "failed_sources_latest": selected_runs[-1].get("failed_or_empty_sources", 0) if selected_runs else 0,
+        "recent_success_rate": round(successes / observations * 100, 1) if observations else None,
+        "database_article_count": len(articles),
+        "sources": source_rows,
+    }
+
+
 # API homepage
 @app.get("/")
 def home():
