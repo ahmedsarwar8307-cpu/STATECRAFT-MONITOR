@@ -1641,11 +1641,20 @@ def get_country_strategic_brief(
         reverse=True,
     )
 
+    canonical_country = next(
+        (
+            value.strip()
+            for article in matched
+            for value in parse_field(article.get("countries"))
+            if value.casefold() == country.casefold()
+        ),
+        country,
+    )
+
     return {
         "available": True,
         "brief_type": "Country Strategic Assessment",
-        "country": matched[0].get("countries", country).split(",")[0].strip()
-            if matched[0].get("countries") else country,
+        "country": canonical_country,
         "generated_at": datetime.now(timezone.utc).isoformat(),
         "period_days": days,
         "data_through": latest_date.isoformat(),
