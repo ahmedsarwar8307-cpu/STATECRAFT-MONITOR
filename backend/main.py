@@ -1373,7 +1373,7 @@ def get_strategic_signals(days: int = Query(default=14, ge=7, le=30)):
                 ),
             })
 
-    event_analysis = build_event_clusters(articles, window_days=90, min_articles=2)
+    event_analysis = build_event_clusters(recent, window_days=90, min_articles=2)
     for cluster in event_analysis.get("clusters", []):
         if cluster.get("latest_seen", "") < recent_start.isoformat():
             continue
@@ -1420,8 +1420,8 @@ def get_strategic_signals(days: int = Query(default=14, ge=7, le=30)):
     signals.sort(
         key=lambda item: (
             type_order.get(item["type"], 9),
-            item.get("source_count", 0),
-            item.get("recent_mentions", 0),
+            -item.get("source_count", 0),
+            -item.get("recent_mentions", 0),
             item["name"].casefold(),
         ),
         reverse=False,
