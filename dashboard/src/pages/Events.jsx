@@ -66,7 +66,6 @@ function Events() {
 
   async function toggleTrackedEvent() {
     if (!selectedCluster || watchlistBusy) return
-    setWatchlistBusy(true)
     setWatchlistError('')
     setWatchlistMessage('')
     const trackedEntry = watchlist.find((item) =>
@@ -82,6 +81,7 @@ function Events() {
       return
     }
     const actionArticleId = isTracked ? trackedEntry.cluster_id : anchorArticleId
+    setWatchlistBusy(true)
     try {
       const response = await fetch(
         `${API_BASE}/api/events/watchlist?article_id=${actionArticleId}`,
