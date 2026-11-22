@@ -578,8 +578,8 @@ def build_event_development(members):
             "article_count": first_count,
         },
         "later_phase": {
-            "start": (split_date + timedelta(days=1)).isoformat(),
-            "end": end_date.isoformat(),
+            "start": (split_date + timedelta(days=1)).isoformat() if later_phase else None,
+            "end": end_date.isoformat() if later_phase else None,
             "article_count": later_count,
         },
         "reporting_change": {
