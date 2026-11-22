@@ -3103,3 +3103,23 @@
     text-align: left;
   }
 }
+
+.event-action-feedback {
+  margin: 8px 0 12px;
+  padding: 9px 11px;
+  border-left: 2px solid var(--accent);
+  background: var(--bg-main);
+  color: var(--text-secondary);
+  font-size: 11px;
+  line-height: 1.6;
+}
+
+.event-action-feedback.success {
+  border-left-color: #72b99b;
+}
+
+.event-action-feedback.error {
+  border-left-color: #d87979;
+  color: #d99a9a;
+}
+
