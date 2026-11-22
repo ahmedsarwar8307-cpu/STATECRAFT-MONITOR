@@ -437,6 +437,10 @@ function Events() {
             event clusters, not verified facts. Similar headlines can still refer
             to separate developments; review the linked source reports before
             drawing conclusions. Articles without valid dates are excluded.
+            Development phases divide each cluster's observed date span into
+            earlier and later periods. Newly observed countries, topics and
+            sources describe changes in this dataset's reporting coverage, not
+            confirmed real-world involvement.
           </p>
         </>
       )}
