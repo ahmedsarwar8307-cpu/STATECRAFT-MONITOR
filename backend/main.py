@@ -1389,7 +1389,7 @@ def get_strategic_signals(days: int = Query(default=14, ge=7, le=30)):
             "type": "multi_source_event",
             "label": "Multi-source event coverage",
             "name": cluster.get("headline") or "Unlabelled event",
-            "status": "corroborated_coverage",
+            "status": "multiple_publishers",
             "recent_mentions": cluster.get("article_count", 0),
             "previous_mentions": None,
             "change": None,
