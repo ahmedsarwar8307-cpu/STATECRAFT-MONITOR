@@ -6,6 +6,7 @@ import {
   Globe2,
   Crosshair,
   TrendingUp,
+  Activity,
   Network,
   Search,
   FileText,
@@ -18,6 +19,7 @@ const navigation = [
   { name: 'Intelligence', path: '/intelligence', icon: Crosshair },
   { name: 'Geopolitical Trends', path: '/trends', icon: TrendingUp },
   { name: 'Event Clustering', path: '/events', icon: Network },
+  { name: 'Source Reliability', path: '/sources', icon: Activity },
   { name: 'Research', path: '/research', icon: Search },
   { name: 'Reports & Briefings', path: '/reports', icon: FileText },
 ]
