@@ -51,6 +51,14 @@ The project combines a Python data-processing pipeline with a FastAPI backend, S
 - World News and Regions & Countries pages.
 - Country coverage, topic distributions, and article exploration.
 
+### 7. Strategic Coverage Signals
+- Compares country and topic headline coverage across consecutive time windows.
+- Detects notable increases in reporting and newly observed coverage areas.
+- Identifies candidate event clusters appearing across multiple publisher names.
+- Links each signal to supporting headlines and source names for inspection.
+- Uses transparent thresholds and explains the comparison period.
+- Signals describe patterns in collected media coverage; they are not forecasts, fact-check verdicts, or measures of real-world severity.
+
 ---
 
 ## Technology Stack
