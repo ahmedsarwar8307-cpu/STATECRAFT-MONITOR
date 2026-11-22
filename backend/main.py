@@ -1,4 +1,6 @@
 import json
+import hashlib
+import os
 from pathlib import Path
 import sqlite3
 from collections import Counter
@@ -7,6 +9,7 @@ from email.utils import parsedate_to_datetime
 
 from fastapi import FastAPI, HTTPException, Query
 from fastapi.middleware.cors import CORSMiddleware
+import requests
 
 
 # Find the project root directory
@@ -1709,3 +1712,251 @@ def get_country_strategic_brief(
             ],
         },
     }
+
+
+# Optional Gemini AI synthesis. The deterministic country assessment remains
+# available even when no API key is configured or the free quota is exhausted.
+def load_local_environment():
+    env_path = BASE_DIR / ".env"
+    if not env_path.exists():
+        return
+    for raw_line in env_path.read_text(encoding="utf-8").splitlines():
+        line = raw_line.strip()
+        if not line or line.startswith("#") or "=" not in line:
+            continue
+        name, value = line.split("=", 1)
+        name = name.strip()
+        value = value.strip().strip('"').strip("'")
+        if name and value and name not in os.environ:
+            os.environ[name] = value
+
+
+load_local_environment()
+
+
+def build_ai_assessment_cache_key(brief):
+    evidence_fingerprint = {
+        "country": brief.get("country"),
+        "period_days": brief.get("period_days"),
+        "data_through": brief.get("data_through"),
+        "coverage_overview": brief.get("coverage_overview"),
+        "topic_analysis": brief.get("topic_analysis"),
+        "source_distribution": brief.get("source_distribution"),
+        "multi_publisher_event_coverage": brief.get("multi_publisher_event_coverage"),
+        "key_headlines": brief.get("key_headlines"),
+    }
+    encoded = json.dumps(
+        evidence_fingerprint, sort_keys=True, ensure_ascii=False
+    ).encode("utf-8")
+    return hashlib.sha256(encoded).hexdigest()
+
+
+def get_cached_ai_assessment(cache_key):
+    connection = get_database_connection()
+    try:
+        connection.execute("""
+            CREATE TABLE IF NOT EXISTS ai_brief_cache (
+                cache_key TEXT PRIMARY KEY,
+                assessment_json TEXT NOT NULL,
+                generated_at TEXT NOT NULL
+            )
+        """)
+        connection.commit()
+        row = connection.execute(
+            "SELECT assessment_json, generated_at FROM ai_brief_cache WHERE cache_key = ?",
+            (cache_key,),
+        ).fetchone()
+        if not row:
+            return None
+        return {
+            "assessment": json.loads(row["assessment_json"]),
+            "generated_at": row["generated_at"],
+            "cached": True,
+        }
+    finally:
+        connection.close()
+
+
+def save_ai_assessment_cache(cache_key, assessment, generated_at):
+    connection = get_database_connection()
+    try:
+        connection.execute("""
+            CREATE TABLE IF NOT EXISTS ai_brief_cache (
+                cache_key TEXT PRIMARY KEY,
+                assessment_json TEXT NOT NULL,
+                generated_at TEXT NOT NULL
+            )
+        """)
+        connection.execute(
+            """
+            INSERT OR REPLACE INTO ai_brief_cache
+            (cache_key, assessment_json, generated_at)
+            VALUES (?, ?, ?)
+            """,
+            (
+                cache_key,
+                json.dumps(assessment, ensure_ascii=False),
+                generated_at,
+            ),
+        )
+        connection.commit()
+    finally:
+        connection.close()
+
+
+def build_ai_assessment_prompt(brief):
+    evidence = {
+        "country": brief.get("country"),
+        "analysis_period": brief.get("period"),
+        "comparison_period": brief.get("comparison_period"),
+        "coverage_overview": brief.get("coverage_overview"),
+        "topic_analysis": brief.get("topic_analysis", []),
+        "publisher_distribution": brief.get("source_distribution", []),
+        "multi_publisher_event_coverage": brief.get("multi_publisher_event_coverage", []),
+        "key_headlines": [
+            {
+                "article_id": item.get("id"),
+                "headline": item.get("title"),
+                "publisher": item.get("source"),
+                "published": item.get("published"),
+                "topics": item.get("topics", []),
+            }
+            for item in brief.get("key_headlines", [])
+        ],
+        "known_limitations": brief.get("data_quality", {}).get("limitations", []),
+    }
+    return (
+        "You are the analytical writing component of STATECRAFT MONITOR, an "
+        "evidence-led geopolitical news monitoring platform. Prepare a cautious "
+        "country strategic assessment using ONLY the supplied evidence package. "
+        "Do not use outside knowledge, invent facts, infer motives, or turn media "
+        "attention into a claim about real-world severity. Distinguish reported "
+        "developments from your interpretation. Treat publisher names as source "
+        "labels, not proof of independent verification. If evidence is thin, say so. "
+        "Every concrete development should include supporting article IDs in the "
+        "form [Article ID: 123]. Do not cite an ID that is not in the evidence. "
+        "Potential implications must be explicitly framed as conditional analytical "
+        "possibilities, not predictions. Identify uncertainty and information gaps. "
+        "Return ONLY valid JSON with exactly these keys, each value an array of "
+        "2-4 concise strings: executive_overview, major_developments, "
+        "analytical_observations, potential_implications, uncertainties_information_gaps. "
+        "No markdown fences and no extra keys.\n\nEVIDENCE PACKAGE:\n"
+        + json.dumps(evidence, ensure_ascii=False)
+    )
+
+
+def generate_gemini_assessment(brief):
+    api_key = os.getenv("GEMINI_API_KEY") or os.getenv("GOOGLE_API_KEY")
+    if not api_key:
+        raise HTTPException(
+            status_code=503,
+            detail="Gemini is not configured yet. Add GEMINI_API_KEY to the local .env file.",
+        )
+
+    cache_key = build_ai_assessment_cache_key(brief)
+    cached = get_cached_ai_assessment(cache_key)
+    if cached:
+        return {
+            "available": True,
+            "provider": "Google Gemini",
+            "model": os.getenv("GEMINI_MODEL", "gemini-3.8-flash"),
+            **cached,
+        }
+
+    model = os.getenv("GEMINI_MODEL", "gemini-3.8-flash").strip()
+    endpoint = (
+        "https://generativelanguage.googleapis.com/v1beta/models/"
+        + model
+        + ":generateContent"
+    )
+    payload = {
+        "contents": [{
+            "role": "user",
+            "parts": [{"text": build_ai_assessment_prompt(brief)}],
+        }],
+        "generationConfig": {
+            "temperature": 0.25,
+            "maxOutputTokens": 1800,
+            "responseMimeType": "application/json",
+        },
+    }
+
+    try:
+        response = requests.post(
+            endpoint,
+            headers={
+                "x-goog-api-key": api_key,
+                "Content-Type": "application/json",
+            },
+            json=payload,
+            timeout=(10, 60),
+        )
+    except requests.RequestException:
+        raise HTTPException(
+            status_code=502,
+            detail="Could not reach Gemini. Check your internet connection and try again.",
+        )
+
+    if response.status_code == 429:
+        raise HTTPException(
+            status_code=429,
+            detail="Gemini's free-tier request limit has been reached. Try again later; your evidence-based report is still available.",
+        )
+    if response.status_code in (401, 403):
+        raise HTTPException(
+            status_code=502,
+            detail="Gemini rejected the API key or project access. Check the key in Google AI Studio.",
+        )
+    if not response.ok:
+        raise HTTPException(
+            status_code=502,
+            detail=f"Gemini returned an API error (HTTP {response.status_code}). Check the configured model and API access.",
+        )
+
+    try:
+        response_data = response.json()
+        generated_text = response_data["candidates"][0]["content"]["parts"][0]["text"]
+        assessment = json.loads(generated_text)
+        required_sections = (
+            "executive_overview",
+            "major_developments",
+            "analytical_observations",
+            "potential_implications",
+            "uncertainties_information_gaps",
+        )
+        if not isinstance(assessment, dict) or any(
+            not isinstance(assessment.get(section), list)
+            or not assessment[section]
+            for section in required_sections
+        ):
+            raise ValueError("Gemini response did not match the required assessment structure.")
+        assessment = {
+            section: [str(item) for item in assessment[section][:4]]
+            for section in required_sections
+        }
+    except (KeyError, IndexError, TypeError, ValueError, json.JSONDecodeError):
+        raise HTTPException(
+            status_code=502,
+            detail="Gemini responded, but its assessment could not be validated. Please try again.",
+        )
+
+    generated_at = datetime.now(timezone.utc).isoformat()
+    save_ai_assessment_cache(cache_key, assessment, generated_at)
+    return {
+        "available": True,
+        "provider": "Google Gemini",
+        "model": model,
+        "assessment": assessment,
+        "generated_at": generated_at,
+        "cached": False,
+    }
+
+
+@app.get("/api/briefs/country/{country}/ai")
+def get_ai_country_strategic_assessment(
+    country: str,
+    days: int = Query(default=30, ge=7, le=90),
+):
+    """Generate a cached AI interpretation from the existing evidence-led brief."""
+    brief = get_country_strategic_brief(country, days)
+    return generate_gemini_assessment(brief)
