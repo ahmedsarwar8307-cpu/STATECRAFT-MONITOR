@@ -3340,7 +3340,7 @@
 .signal-card-top{display:flex;justify-content:space-between;align-items:center;gap:10px}
 .signal-type{color:var(--accent-light);font-size:9px;font-weight:700;letter-spacing:.8px;text-transform:uppercase}
 .signal-state{padding:4px 7px;border:1px solid var(--border);color:var(--text-muted);font-size:8px;font-weight:700;letter-spacing:.5px}
-.signal-state.new,.signal-state.rising,.signal-state.corroborated_coverage{color:#72b99b;border-color:#426b5b}
+.signal-state.new,.signal-state.rising,.signal-state.multiple_publishers{color:#72b99b;border-color:#426b5b}
 .signal-card h3{margin:12px 0 9px;color:var(--text-primary);font-family:'Playfair Display',serif;font-size:18px;font-weight:500;line-height:1.45;overflow-wrap:anywhere}
 .signal-card p{margin:0;color:var(--text-secondary);font-size:11px;line-height:1.7}
 .signal-metrics{display:flex;flex-wrap:wrap;gap:8px 15px;margin:13px 0;color:var(--text-muted);font-size:10px}
