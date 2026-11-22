@@ -3358,3 +3358,85 @@
 .signal-methodology strong{color:var(--text-primary)}
 @media(max-width:900px){.signal-summary{grid-template-columns:repeat(2,minmax(0,1fr))}.signal-grid{grid-template-columns:1fr}}
 @media(max-width:600px){.signal-controls{align-items:flex-start;flex-direction:column}.signal-summary{grid-template-columns:1fr 1fr}.signals-page .signal-period{flex-direction:column}}
+
+
+/* COUNTRY STRATEGIC ASSESSMENT BRIEFS */
+.brief-builder{margin:24px 0 20px;padding:20px;border:1px solid var(--border);background:var(--bg-card)}
+.brief-builder-heading{display:flex;justify-content:space-between;align-items:center;color:var(--accent-light)}
+.brief-builder-heading h2{margin:6px 0 0;color:var(--text-primary);font-family:'Playfair Display',serif;font-size:21px;font-weight:500}
+.brief-builder-controls{display:grid;grid-template-columns:minmax(180px,1.2fr) minmax(140px,.7fr) auto;align-items:end;gap:12px;margin:20px 0 12px}
+.brief-builder-controls label{display:flex;flex-direction:column;gap:7px}
+.brief-builder-controls label span{color:var(--text-muted);font-size:9px;font-weight:700;letter-spacing:.8px}
+.brief-builder-controls select{width:100%;min-height:41px;padding:9px 11px;border:1px solid var(--border);background:var(--bg-main);color:var(--text-primary);font:inherit;font-size:12px}
+.brief-generate-button,.brief-document-toolbar button{min-height:41px;display:inline-flex;align-items:center;justify-content:center;gap:8px;padding:10px 14px;border:1px solid var(--accent);background:var(--accent);color:#fff;font-family:inherit;font-size:10px;font-weight:700;letter-spacing:.6px;cursor:pointer}
+.brief-generate-button:disabled{opacity:.55;cursor:wait}
+.brief-builder>small{color:var(--text-muted);font-size:10px;line-height:1.6}
+.brief-status,.brief-empty{margin:20px 0;padding:22px;border:1px solid var(--border);background:var(--bg-card);color:var(--text-secondary);font-size:12px;line-height:1.7}
+.brief-error{border-color:#805050;color:#d99a9a}
+.brief-empty{text-align:center;padding:42px 24px}
+.brief-empty svg{color:var(--accent-light)}
+.brief-empty h3{margin:12px 0 7px;color:var(--text-primary);font-family:'Playfair Display',serif;font-size:20px;font-weight:500}
+.brief-empty p{max-width:620px;margin:0 auto}
+.brief-document-toolbar{display:flex;justify-content:space-between;align-items:center;gap:12px;padding:12px 0;color:var(--text-muted);font-size:9px;letter-spacing:.7px}
+.brief-document-toolbar button{min-height:34px;background:transparent;color:var(--accent-light)}
+.brief-cover{min-height:270px;display:flex;flex-direction:column;justify-content:space-between;padding:25px 28px;border:1px solid var(--border);background:linear-gradient(145deg,#111b2a,#17263a);color:#f5f0e7}
+.brief-cover-top,.brief-cover-bottom{display:flex;justify-content:space-between;gap:12px;color:#b6c0cc;font-size:9px;font-weight:700;letter-spacing:1px}
+.brief-cover-main{padding:30px 0}
+.brief-cover-main h2{margin:10px 0;color:#fff;font-family:'Playfair Display',serif;font-size:clamp(34px,6vw,54px);font-weight:500}
+.brief-cover-main p{margin:0;color:#c5cbd2;font-size:13px}
+.brief-section{margin:18px 0;padding:22px;border:1px solid var(--border);background:var(--bg-card);break-inside:avoid}
+.brief-section h3{margin:7px 0 13px;color:var(--text-primary);font-family:'Playfair Display',serif;font-size:21px;font-weight:500}
+.brief-section>p{color:var(--text-secondary);font-size:12px;line-height:1.8}
+.brief-section>p strong{color:var(--text-primary)}
+.brief-metrics-grid{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:9px;margin:18px 0}
+.brief-metric{min-width:0;padding:13px;border:1px solid var(--border);background:var(--bg-main)}
+.brief-metric span,.brief-metric strong,.brief-metric small{display:block}
+.brief-metric span{color:var(--text-muted);font-size:8px;font-weight:700;letter-spacing:.7px}
+.brief-metric strong{margin:9px 0 5px;color:var(--accent-light);font-family:'Playfair Display',serif;font-size:24px;font-weight:500;overflow-wrap:anywhere}
+.brief-metric small{color:var(--text-muted);font-size:9px;line-height:1.5}
+.brief-assessment-note{padding:12px;border-left:2px solid var(--accent);background:var(--bg-main);color:var(--text-secondary);font-size:11px;line-height:1.7}
+.brief-table-wrap{width:100%;overflow-x:auto}
+.brief-table{width:100%;min-width:550px;border-collapse:collapse;text-align:left}
+.brief-table th{padding:10px;border-bottom:1px solid var(--border);color:var(--text-muted);font-size:9px;letter-spacing:.6px;text-transform:uppercase}
+.brief-table td{padding:11px 10px;border-bottom:1px solid var(--border);color:var(--text-secondary);font-size:11px}
+.brief-table td:first-child{color:var(--text-primary);font-weight:600}
+.brief-source-list>div{display:flex;justify-content:space-between;gap:12px;padding:10px 0;border-bottom:1px solid var(--border);color:var(--text-secondary);font-size:11px}
+.brief-source-list strong{color:var(--text-primary)}
+.brief-event{margin:14px 0;padding:14px;border:1px solid var(--border);background:var(--bg-main);break-inside:avoid}
+.brief-event h4{margin:0 0 7px;color:var(--text-primary);font-size:13px;line-height:1.6}
+.brief-event>p{color:var(--text-muted);font-size:10px}
+.brief-source-tags{display:flex;flex-wrap:wrap;gap:6px;margin:9px 0}
+.brief-source-tags span{padding:5px 7px;border:1px solid var(--border);color:var(--text-secondary);font-size:9px}
+.brief-caveat,.brief-generated-note{display:block;margin-top:12px;color:var(--text-muted);font-size:10px;line-height:1.7}
+.brief-evidence-row{padding:12px 0;border-bottom:1px solid var(--border);break-inside:avoid}
+.brief-evidence-row strong{display:block;color:var(--text-primary);font-size:11px;line-height:1.65}
+.brief-evidence-row small{display:block;margin:5px 0;color:var(--text-muted);font-size:9px;line-height:1.6}
+.brief-evidence-row a{color:var(--accent-light);font-size:10px;text-decoration:none}
+.brief-evidence-row a:hover{text-decoration:underline}
+.brief-timeline{display:flex;align-items:stretch;gap:5px;min-height:150px;overflow-x:auto;padding:10px 0;border-bottom:1px solid var(--border)}
+.brief-timeline>div{min-width:25px;flex:1 0 25px;display:grid;grid-template-rows:14px minmax(75px,1fr) 22px;justify-items:center;gap:5px}
+.brief-timeline strong{color:var(--text-secondary);font-size:9px}
+.brief-timeline i{align-self:end;width:70%;min-height:0;background:var(--accent)}
+.brief-timeline small{color:var(--text-muted);font-size:8px;white-space:nowrap}
+.brief-limitations{padding-left:18px;color:var(--text-secondary);font-size:11px;line-height:1.8}
+.brief-footnote{padding:12px;border:1px solid var(--border);background:var(--bg-main);font-size:10px!important}
+.brief-generated-note{padding-top:10px;border-top:1px solid var(--border)}
+.brief-spinning{animation:brief-spin 1s linear infinite}
+@keyframes brief-spin{to{transform:rotate(360deg)}}
+@media(max-width:760px){.brief-builder-controls{grid-template-columns:1fr 1fr}.brief-generate-button{grid-column:1/-1}.brief-metrics-grid{grid-template-columns:repeat(2,minmax(0,1fr))}.brief-section{padding:15px}.brief-cover{min-height:230px;padding:19px}.brief-cover-top,.brief-cover-bottom{font-size:8px}}
+@media(max-width:440px){.brief-builder-controls{grid-template-columns:1fr}.brief-generate-button{grid-column:auto}.brief-document-toolbar{align-items:flex-start;flex-direction:column}.brief-cover-top,.brief-cover-bottom{flex-direction:column}}
+@media print{
+  @page{size:A4;margin:15mm}
+  body{background:#fff!important;color:#111!important}
+  .sidebar,.no-print,.brief-builder,.brief-status,.brief-empty{display:none!important}
+  .main-content,.content,.page-section{width:100%!important;max-width:none!important;margin:0!important;padding:0!important;background:#fff!important;color:#111!important}
+  .strategic-brief{color:#111!important}
+  .brief-cover{min-height:240px!important;print-color-adjust:exact;-webkit-print-color-adjust:exact}
+  .brief-section{margin:10px 0;padding:14px;border:1px solid #ccc;background:#fff!important;break-inside:avoid}
+  .brief-section h3,.brief-evidence-row strong,.brief-event h4,.brief-table td:first-child{color:#111!important}
+  .brief-section>p,.brief-table td,.brief-limitations,.brief-evidence-row small,.brief-source-list>div{color:#333!important}
+  .brief-metric,.brief-event,.brief-assessment-note,.brief-footnote{background:#f7f7f7!important;print-color-adjust:exact;-webkit-print-color-adjust:exact}
+  .brief-metric strong{color:#222!important}
+  .brief-evidence-row a{color:#222!important}
+  a{color:#111!important;text-decoration:none!important}
+}
