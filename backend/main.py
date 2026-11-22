@@ -1261,3 +1261,201 @@ def get_country_details(country: str):
         ],
         "articles": matching_articles,
     }
+
+
+# Strategic coverage signals
+@app.get("/api/strategic-signals")
+def get_strategic_signals(days: int = Query(default=14, ge=7, le=30)):
+    """Identify notable changes in media coverage, not real-world risk predictions."""
+    articles = get_all_articles()
+    dated_articles = []
+    for article in articles:
+        published_date = get_published_date(article.get("published"))
+        if published_date:
+            dated_articles.append((date.fromisoformat(published_date), article))
+
+    if not dated_articles:
+        return {
+            "available": False,
+            "message": "No valid publication dates are available for signal analysis.",
+            "days": days,
+            "latest_data_date": None,
+            "articles_analysed": 0,
+            "signals": [],
+            "summary": {"total_signals": 0, "country_shifts": 0,
+                        "topic_shifts": 0, "multi_source_events": 0},
+        }
+
+    latest_date = max(item[0] for item in dated_articles)
+    recent_start = latest_date - timedelta(days=days - 1)
+    previous_end = recent_start - timedelta(days=1)
+    previous_start = previous_end - timedelta(days=days - 1)
+
+    recent = [
+        article for published_date, article in dated_articles
+        if recent_start <= published_date <= latest_date
+    ]
+    previous = [
+        article for published_date, article in dated_articles
+        if previous_start <= published_date <= previous_end
+    ]
+
+    def dimension_counts(items, field):
+        counts = Counter()
+        sources = {}
+        examples = {}
+        for article in items:
+            values = {
+                value for value in parse_field(article.get(field))
+                if value and value.casefold() != "unknown"
+            }
+            for value in values:
+                counts[value] += 1
+                if article.get("source"):
+                    sources.setdefault(value, set()).add(article["source"])
+                examples.setdefault(value, [])
+                if len(examples[value]) < 4:
+                    examples[value].append({
+                        "id": article.get("id"),
+                        "title": article.get("title"),
+                        "source": article.get("source"),
+                        "published": article.get("published"),
+                        "link": article.get("link"),
+                    })
+        return counts, sources, examples
+
+    signals = []
+    for field, signal_type, label in (
+        ("countries", "country_shift", "Country coverage shift"),
+        ("topics", "topic_shift", "Topic coverage shift"),
+    ):
+        recent_counts, recent_sources, recent_examples = dimension_counts(recent, field)
+        previous_counts, _, _ = dimension_counts(previous, field)
+
+        for name, recent_count in recent_counts.items():
+            previous_count = previous_counts.get(name, 0)
+            difference = recent_count - previous_count
+            if recent_count < 2:
+                continue
+
+            if previous_count == 0:
+                status = "new"
+                change_percent = None
+                qualifies = True
+            else:
+                change_percent = round((difference / previous_count) * 100, 1)
+                status = "rising" if difference > 0 else (
+                    "declining" if difference < 0 else "stable"
+                )
+                qualifies = difference >= 2 and change_percent >= 50
+
+            if not qualifies:
+                continue
+
+            source_names = sorted(recent_sources.get(name, set()), key=str.casefold)
+            signals.append({
+                "id": f"{signal_type}:{name.casefold()}",
+                "type": signal_type,
+                "label": label,
+                "name": name,
+                "status": status,
+                "recent_mentions": recent_count,
+                "previous_mentions": previous_count,
+                "change": difference,
+                "change_percent": change_percent,
+                "source_count": len(source_names),
+                "sources": source_names[:8],
+                "articles": recent_examples.get(name, []),
+                "interpretation": (
+                    f"Reporting about {name} appeared in {recent_count} articles "
+                    f"across {len(source_names)} source(s), compared with "
+                    f"{previous_count} in the preceding {days}-day period."
+                ),
+            })
+
+    event_analysis = build_event_clusters(articles, window_days=90, min_articles=2)
+    for cluster in event_analysis.get("clusters", []):
+        if cluster.get("latest_seen", "") < recent_start.isoformat():
+            continue
+        source_names = sorted(
+            {item.get("name") for item in cluster.get("sources", []) if item.get("name")},
+            key=str.casefold,
+        )
+        if len(source_names) < 2:
+            continue
+
+        signals.append({
+            "id": f"event:{cluster.get('cluster_id')}",
+            "type": "multi_source_event",
+            "label": "Multi-source event coverage",
+            "name": cluster.get("headline") or "Unlabelled event",
+            "status": "corroborated_coverage",
+            "recent_mentions": cluster.get("article_count", 0),
+            "previous_mentions": None,
+            "change": None,
+            "change_percent": None,
+            "source_count": len(source_names),
+            "sources": source_names[:8],
+            "countries": [item.get("name") for item in cluster.get("countries", [])[:6]],
+            "topics": [item.get("name") for item in cluster.get("topics", [])[:6]],
+            "articles": [
+                {
+                    "id": article.get("id"),
+                    "title": article.get("title"),
+                    "source": article.get("source"),
+                    "published": article.get("published"),
+                    "link": article.get("link"),
+                }
+                for article in cluster.get("articles", [])[:5]
+            ],
+            "interpretation": (
+                f"This event cluster contains {cluster.get('article_count', 0)} "
+                f"related headlines from {len(source_names)} publishers. "
+                "This is evidence of cross-publisher coverage, not independent "
+                "verification of every claim in those reports."
+            ),
+        })
+
+    type_order = {"multi_source_event": 0, "country_shift": 1, "topic_shift": 2}
+    signals.sort(
+        key=lambda item: (
+            type_order.get(item["type"], 9),
+            item.get("source_count", 0),
+            item.get("recent_mentions", 0),
+            item["name"].casefold(),
+        ),
+        reverse=False,
+    )
+    signals = signals[:30]
+
+    return {
+        "available": True,
+        "days": days,
+        "latest_data_date": latest_date.isoformat(),
+        "recent_period": {
+            "start": recent_start.isoformat(),
+            "end": latest_date.isoformat(),
+            "article_count": len(recent),
+        },
+        "previous_period": {
+            "start": previous_start.isoformat(),
+            "end": previous_end.isoformat(),
+            "article_count": len(previous),
+        },
+        "articles_analysed": len(dated_articles),
+        "signals": signals,
+        "summary": {
+            "total_signals": len(signals),
+            "country_shifts": sum(item["type"] == "country_shift" for item in signals),
+            "topic_shifts": sum(item["type"] == "topic_shift" for item in signals),
+            "multi_source_events": sum(item["type"] == "multi_source_event" for item in signals),
+        },
+        "methodology": (
+            "Signals are generated from changes in collected headline coverage. "
+            "Country/topic shifts require at least two recent mentions and either "
+            "no previous-period mentions or an increase of at least two mentions "
+            "and 50 percent. Multi-source event signals require at least two "
+            "publishers in a candidate headline cluster. These are monitoring "
+            "indicators, not forecasts, severity ratings, or fact-check verdicts."
+        ),
+    }
