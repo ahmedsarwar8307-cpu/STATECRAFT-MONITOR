@@ -687,69 +687,99 @@ def get_tracked_events():
         connection.close()
 
     current = build_event_clusters(get_all_articles(), window_days=90)
-    current_by_id = {
-        cluster["cluster_id"]: cluster for cluster in current.get("clusters", [])
-    }
+    current_clusters = current.get("clusters", [])
     results = []
+
     for item in tracked:
-        cluster = current_by_id.get(item["cluster_id"])
+        # cluster_id is retained as a stable anchor article ID, not as a
+        # temporary cluster ID. A cluster may merge or split as the window changes.
+        cluster = next(
+            (
+                candidate for candidate in current_clusters
+                if any(
+                    article.get("id") == item["cluster_id"]
+                    for article in candidate.get("articles", [])
+                )
+            ),
+            None,
+        )
         results.append({
             **item,
             "currently_detected": cluster is not None,
             "article_count": cluster["article_count"] if cluster else 0,
             "latest_seen": cluster["latest_seen"] if cluster else None,
             "headline": cluster["headline"] if cluster else item["headline"],
+            "article_ids": [
+                article.get("id") for article in cluster.get("articles", [])
+            ] if cluster else [item["cluster_id"]],
         })
+
     return {"tracked_count": len(results), "events": results}
 
 
 @app.post("/api/events/watchlist")
-def track_event(cluster_id: int = Query(..., ge=1)):
+def track_event(article_id: int = Query(..., ge=1)):
     ensure_event_watchlist_table()
     analysis = build_event_clusters(get_all_articles(), window_days=90)
     cluster = next(
-        (item for item in analysis.get("clusters", [])
-         if item["cluster_id"] == cluster_id),
+        (
+            item for item in analysis.get("clusters", [])
+            if any(
+                article.get("id") == article_id
+                for article in item.get("articles", [])
+            )
+        ),
         None,
     )
     if not cluster:
         raise HTTPException(
             status_code=404,
-            detail="This event is no longer present in the latest 90-day analysis.",
+            detail="This article is not part of a detected event in the latest 90-day analysis.",
         )
 
+    # Save the selected article's ID as a stable anchor. Do not save the
+    # generated cluster ID, because that ID can change when clusters merge.
     connection = get_database_connection()
     try:
         connection.execute(
             """
             INSERT INTO tracked_events (cluster_id, headline, tracked_at)
             VALUES (?, ?, ?)
-            ON CONFLICT(cluster_id) DO UPDATE SET headline = excluded.headline
+            ON CONFLICT(cluster_id) DO UPDATE SET
+                headline = excluded.headline,
+                tracked_at = excluded.tracked_at
             """,
-            (cluster_id, cluster["headline"], datetime.now(timezone.utc).isoformat()),
+            (article_id, cluster["headline"], datetime.now(timezone.utc).isoformat()),
         )
         connection.commit()
     finally:
         connection.close()
 
-    return {"tracked": True, "cluster_id": cluster_id, "headline": cluster["headline"]}
+    return {
+        "tracked": True,
+        "article_id": article_id,
+        "headline": cluster["headline"],
+        "article_ids": [
+            article.get("id") for article in cluster.get("articles", [])
+        ],
+    }
 
 
 @app.delete("/api/events/watchlist")
-def untrack_event(cluster_id: int = Query(..., ge=1)):
+def untrack_event(article_id: int = Query(..., ge=1)):
     ensure_event_watchlist_table()
     connection = get_database_connection()
     try:
         cursor = connection.execute(
             "DELETE FROM tracked_events WHERE cluster_id = ?",
-            (cluster_id,),
+            (article_id,),
         )
         connection.commit()
         if cursor.rowcount == 0:
             raise HTTPException(status_code=404, detail="Tracked event not found.")
     finally:
         connection.close()
-    return {"tracked": False, "cluster_id": cluster_id}
+    return {"tracked": False, "article_id": article_id}
 
 
 # API homepage
