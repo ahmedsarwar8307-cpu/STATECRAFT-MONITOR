@@ -69,10 +69,22 @@ function Events() {
     setWatchlistBusy(true)
     setWatchlistError('')
     setWatchlistMessage('')
-    const isTracked = watchlist.some((item) => item.cluster_id === selectedCluster.cluster_id)
+    const trackedEntry = watchlist.find((item) =>
+      (item.article_ids || [item.cluster_id]).some((id) =>
+        selectedCluster.articles.some((article) => article.id === id)
+      )
+    )
+    const isTracked = Boolean(trackedEntry)
+    const anchorArticleId = selectedCluster.articles[0]?.id
+    if (!isTracked && !anchorArticleId) {
+      setWatchlistError('This event has no article identifier and cannot be tracked.')
+      setWatchlistMessage('Watchlist update failed: no article identifier was available.')
+      return
+    }
+    const actionArticleId = isTracked ? trackedEntry.cluster_id : anchorArticleId
     try {
       const response = await fetch(
-        `${API_BASE}/api/events/watchlist?cluster_id=${selectedCluster.cluster_id}`,
+        `${API_BASE}/api/events/watchlist?article_id=${actionArticleId}`,
         { method: isTracked ? 'DELETE' : 'POST' }
       )
       if (!response.ok) {
@@ -99,6 +111,13 @@ function Events() {
   const selectedCluster = data?.clusters?.find(
     (cluster) => cluster.cluster_id === selectedId
   )
+  const selectedTrackedEvent = selectedCluster
+    ? watchlist.find((item) =>
+        (item.article_ids || [item.cluster_id]).some((id) =>
+          selectedCluster.articles.some((article) => article.id === id)
+        )
+      )
+    : null
 
   return (
     <section className="page-section regional-page events-page">
@@ -251,7 +270,7 @@ function Events() {
                     onClick={toggleTrackedEvent}
                     disabled={watchlistBusy}
                   >
-                    {watchlistBusy ? 'UPDATING WATCHLIST…' : watchlist.some((item) => item.cluster_id === selectedCluster.cluster_id) ? 'REMOVE FROM WATCHLIST' : '＋ TRACK THIS EVENT'}
+                    {watchlistBusy ? 'UPDATING WATCHLIST…' : selectedTrackedEvent ? 'REMOVE FROM WATCHLIST' : '＋ TRACK THIS EVENT'}
                   </button>
                   {watchlistMessage && (
                     <p className={`event-action-feedback ${watchlistError ? 'error' : 'success'}`} role="status" aria-live="polite">
