@@ -117,8 +117,8 @@ STATECRAFT-MONITOR/
 ### 1. Clone the repository
 
 ```bash
-git clone YOUR_GITHUB_REPOSITORY_URL
-cd GeoIntel-AI
+git clone https://github.com/ahmedsarwar8307-cpu/STATECRAFT-MONITOR.git
+cd STATECRAFT-MONITOR
 ```
 
 Replace `YOUR_GITHUB_REPOSITORY_URL` with the repository's actual URL.
@@ -179,11 +179,13 @@ Keep both the backend and frontend running while using the dashboard.
 
 The Python processing scripts can be executed from the project root in this order:
 
-1. `src/news_collector.py` — collect RSS news.
+1. `src/news_collector.py` — collect RSS news, retry temporary feed failures, normalize article links and publication dates, and write a source-by-source collection report.
 2. `src/data_processor.py` — clean and validate records.
 3. `src/country_recognizer.py` — identify countries.
 4. `src/topic_classifier.py` — classify topics.
 5. `src/database_manager.py` — synchronize processed records with SQLite.
+
+The collector writes the latest successful collection snapshot to `data/raw/news.csv` and a diagnostic report to `data/raw/collection_report.json`. If every source fails or returns no valid articles, it preserves the previous raw dataset. SQLite remains the historical store because database synchronization updates existing article links and does not delete older records.
 
 The repository also includes an existing database and processed dataset snapshot.
 
