@@ -34,6 +34,7 @@ PROJECT_FOLDER = Path(__file__).resolve().parent.parent
 RAW_FOLDER = PROJECT_FOLDER / "data" / "raw"
 OUTPUT_FILE = RAW_FOLDER / "news.csv"
 REPORT_FILE = RAW_FOLDER / "collection_report.json"
+HISTORY_FILE = RAW_FOLDER / "collection_history.jsonl"
 
 
 # ============================================================
@@ -319,6 +320,31 @@ def main():
         json.dumps(report, indent=2, ensure_ascii=False),
         encoding="utf-8",
     )
+
+    # Append each run so reliability can be measured across time.
+    history_record = {
+        "collected_at": report["collected_at"],
+        "configured_sources": report["configured_sources"],
+        "successful_sources": report["successful_sources"],
+        "failed_or_empty_sources": report["failed_or_empty_sources"],
+        "unique_articles_collected": report["unique_articles_collected"],
+        "sources": [
+            {
+                "source": item["source"],
+                "status": item["status"],
+                "attempts": item["attempts"],
+                "accepted_articles": item["accepted_articles"],
+                "error": item["error"],
+                "attempt_errors": item["attempt_errors"],
+            }
+            for item in source_results
+        ],
+    }
+
+    with HISTORY_FILE.open("a", encoding="utf-8") as history_file:
+        history_file.write(
+            json.dumps(history_record, ensure_ascii=False) + "\n"
+        )
 
     print("\n========== COLLECTION REPORT ==========")
     print(f"Sources configured: {len(NEWS_SOURCES)}")
