@@ -1459,3 +1459,244 @@ def get_strategic_signals(days: int = Query(default=14, ge=7, le=30)):
             "indicators, not forecasts, severity ratings, or fact-check verdicts."
         ),
     }
+
+
+# Evidence-led country strategic assessment brief
+@app.get("/api/briefs/country/{country}")
+def get_country_strategic_brief(
+    country: str,
+    days: int = Query(default=30, ge=7, le=90),
+):
+    """Compile a traceable country brief from collected news metadata and headlines."""
+    all_articles = get_all_articles()
+    matched = [
+        article for article in all_articles
+        if any(
+            value.casefold() == country.casefold()
+            for value in parse_field(article.get("countries"))
+        )
+    ]
+
+    if not matched:
+        raise HTTPException(
+            status_code=404,
+            detail=f"No articles currently match {country}.",
+        )
+
+    dated = []
+    undated_count = 0
+    for article in matched:
+        published = get_published_date(article.get("published"))
+        if published:
+            dated.append((date.fromisoformat(published), article))
+        else:
+            undated_count += 1
+
+    if not dated:
+        raise HTTPException(
+            status_code=422,
+            detail=f"Articles for {country} do not contain usable publication dates.",
+        )
+
+    latest_date = max(item[0] for item in dated)
+    recent_start = latest_date - timedelta(days=days - 1)
+    previous_end = recent_start - timedelta(days=1)
+    previous_start = previous_end - timedelta(days=days - 1)
+
+    recent = [
+        article for published, article in dated
+        if recent_start <= published <= latest_date
+    ]
+    previous = [
+        article for published, article in dated
+        if previous_start <= published <= previous_end
+    ]
+
+    def count_dimension(items, field):
+        counts = Counter()
+        for article in items:
+            values = {
+                value for value in parse_field(article.get(field))
+                if value and value.casefold() != "unknown"
+            }
+            counts.update(values)
+        return counts
+
+    recent_topics = count_dimension(recent, "topics")
+    previous_topics = count_dimension(previous, "topics")
+    recent_sources = Counter(
+        article.get("source") for article in recent if article.get("source")
+    )
+    previous_sources = Counter(
+        article.get("source") for article in previous if article.get("source")
+    )
+
+    topic_comparison = []
+    for topic in set(recent_topics) | set(previous_topics):
+        current = recent_topics.get(topic, 0)
+        earlier = previous_topics.get(topic, 0)
+        topic_comparison.append({
+            "topic": topic,
+            "recent_articles": current,
+            "previous_articles": earlier,
+            "change": current - earlier,
+            "status": (
+                "new" if earlier == 0 and current > 0
+                else "rising" if current > earlier
+                else "declining" if current < earlier
+                else "stable"
+            ),
+        })
+    topic_comparison.sort(
+        key=lambda item: (item["recent_articles"], item["change"], item["topic"].casefold()),
+        reverse=True,
+    )
+
+    recent_count = len(recent)
+    previous_count = len(previous)
+    if previous_count == 0:
+        coverage_change = None
+        coverage_status = "no_comparison_baseline"
+    else:
+        coverage_change = round(
+            ((recent_count - previous_count) / previous_count) * 100, 1
+        )
+        coverage_status = (
+            "increased" if recent_count > previous_count
+            else "decreased" if recent_count < previous_count
+            else "unchanged"
+        )
+
+    source_count = len(recent_sources)
+    if recent_count < 5 or source_count < 2:
+        evidence_depth = "Limited"
+        evidence_note = "The selected period contains few articles or a narrow publisher mix. Treat this brief as an initial coverage snapshot."
+    elif recent_count < 15 or source_count < 3:
+        evidence_depth = "Developing"
+        evidence_note = "The selected period provides some cross-publisher coverage, but the evidence base remains modest."
+    else:
+        evidence_depth = "Broader"
+        evidence_note = "The selected period has a broader article and publisher base. This describes coverage depth, not factual accuracy."
+
+    event_result = build_event_clusters(recent, window_days=90, min_articles=2)
+    country_events = []
+    for cluster in event_result.get("clusters", []):
+        event_sources = [
+            item.get("name") for item in cluster.get("sources", [])
+            if item.get("name")
+        ]
+        if len(event_sources) >= 2:
+            country_events.append({
+                "headline": cluster.get("headline"),
+                "article_count": cluster.get("article_count", 0),
+                "source_count": len(event_sources),
+                "sources": event_sources,
+                "first_seen": cluster.get("first_seen"),
+                "latest_seen": cluster.get("latest_seen"),
+                "topics": [item.get("name") for item in cluster.get("topics", [])],
+                "articles": [
+                    {
+                        "id": article.get("id"),
+                        "title": article.get("title"),
+                        "source": article.get("source"),
+                        "published": article.get("published"),
+                        "link": article.get("link"),
+                    }
+                    for article in cluster.get("articles", [])[:5]
+                ],
+            })
+
+    country_events.sort(
+        key=lambda item: (item["article_count"], item["latest_seen"] or ""),
+        reverse=True,
+    )
+
+    timeline_counts = Counter(
+        published.isoformat() for published, _ in dated
+        if recent_start <= published <= latest_date
+    )
+    timeline = [
+        {
+            "date": (recent_start + timedelta(days=offset)).isoformat(),
+            "article_count": timeline_counts.get(
+                (recent_start + timedelta(days=offset)).isoformat(), 0
+            ),
+        }
+        for offset in range(days)
+    ]
+
+    recent_articles = [
+        {
+            "id": article.get("id"),
+            "title": article.get("title"),
+            "source": article.get("source"),
+            "published": article.get("published"),
+            "link": article.get("link"),
+            "topics": parse_field(article.get("topics")),
+        }
+        for article in recent
+    ]
+    recent_articles.sort(
+        key=lambda item: get_published_timestamp(item.get("published")),
+        reverse=True,
+    )
+
+    return {
+        "available": True,
+        "brief_type": "Country Strategic Assessment",
+        "country": matched[0].get("countries", country).split(",")[0].strip()
+            if matched[0].get("countries") else country,
+        "generated_at": datetime.now(timezone.utc).isoformat(),
+        "period_days": days,
+        "data_through": latest_date.isoformat(),
+        "period": {
+            "start": recent_start.isoformat(),
+            "end": latest_date.isoformat(),
+            "article_count": recent_count,
+        },
+        "comparison_period": {
+            "start": previous_start.isoformat(),
+            "end": previous_end.isoformat(),
+            "article_count": previous_count,
+        },
+        "coverage_overview": {
+            "recent_articles": recent_count,
+            "previous_articles": previous_count,
+            "change_percent": coverage_change,
+            "change_status": coverage_status,
+            "all_time_country_articles": len(matched),
+            "recent_source_count": source_count,
+            "previous_source_count": len(previous_sources),
+            "evidence_depth": evidence_depth,
+            "evidence_note": evidence_note,
+        },
+        "topic_analysis": [
+            {
+                **item,
+                "recent_share_percent": round(
+                    (item["recent_articles"] / recent_count) * 100, 1
+                ) if recent_count else 0,
+            }
+            for item in topic_comparison[:10]
+        ],
+        "source_distribution": [
+            {"source": source, "article_count": count}
+            for source, count in recent_sources.most_common()
+        ],
+        "multi_publisher_event_coverage": country_events[:8],
+        "coverage_timeline": timeline,
+        "key_headlines": recent_articles[:20],
+        "data_quality": {
+            "dated_country_articles": len(dated),
+            "undated_country_articles": undated_count,
+            "period_article_count": recent_count,
+            "period_source_count": source_count,
+            "limitations": [
+                "This brief analyses the STATECRAFT MONITOR collection, not all reporting published worldwide.",
+                "Country and topic labels are produced by the project's current rule-based recognition and classification pipeline.",
+                "Headline-level analysis cannot establish the full context or factual accuracy of an article.",
+                "Multiple publishers covering an event does not by itself constitute independent verification.",
+                "Coverage volume is not a measure of national stability, threat level, policy effectiveness or event severity.",
+            ],
+        },
+    }
