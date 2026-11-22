@@ -490,6 +490,108 @@ def event_title_tokens(title):
     }
 
 
+def build_event_development(members):
+    """Summarise how reporting within one candidate event cluster changes over time."""
+    if not members:
+        return {
+            "span_days": 0,
+            "active_days": 0,
+            "daily_timeline": [],
+            "first_phase": {"article_count": 0},
+            "later_phase": {"article_count": 0},
+            "reporting_change": {
+                "difference": 0,
+                "percent": None,
+                "status": "insufficient_data",
+            },
+            "newly_observed": {"countries": [], "topics": [], "sources": []},
+        }
+
+    start_date = min(item["date"] for item in members)
+    end_date = max(item["date"] for item in members)
+    span_days = (end_date - start_date).days + 1
+    split_date = start_date + timedelta(days=max(0, (span_days - 1) // 2))
+
+    first_phase = [
+        item for item in members if item["date"] <= split_date
+    ]
+    later_phase = [
+        item for item in members if item["date"] > split_date
+    ]
+
+    daily_counts = Counter(item["date"].isoformat() for item in members)
+    daily_timeline = [
+        {
+            "date": (start_date + timedelta(days=offset)).isoformat(),
+            "article_count": daily_counts.get(
+                (start_date + timedelta(days=offset)).isoformat(), 0
+            ),
+        }
+        for offset in range(span_days)
+    ]
+
+    first_count = len(first_phase)
+    later_count = len(later_phase)
+    difference = later_count - first_count
+    if first_count == 0:
+        change_percent = None
+        status = "no_baseline"
+    else:
+        change_percent = round((difference / first_count) * 100, 1)
+        status = (
+            "more_reports" if difference > 0
+            else "fewer_reports" if difference < 0
+            else "same_reports"
+        )
+
+    def observed_values(phase, field):
+        values = set()
+        for item in phase:
+            article = item["article"]
+            if field == "sources":
+                value = article.get("source")
+                if value:
+                    values.add(value)
+            else:
+                values.update(
+                    value for value in parse_field(article.get(field))
+                    if value and value.casefold() != "unknown"
+                )
+        return values
+
+    newly_observed = {}
+    for field in ("countries", "topics", "sources"):
+        first_values = observed_values(first_phase, field)
+        later_values = observed_values(later_phase, field)
+        newly_observed[field] = sorted(
+            later_values - first_values,
+            key=str.casefold,
+        )
+
+    return {
+        "span_days": span_days,
+        "active_days": sum(1 for count in daily_counts.values() if count),
+        "split_date": split_date.isoformat(),
+        "first_phase": {
+            "start": start_date.isoformat(),
+            "end": split_date.isoformat(),
+            "article_count": first_count,
+        },
+        "later_phase": {
+            "start": (split_date + timedelta(days=1)).isoformat(),
+            "end": end_date.isoformat(),
+            "article_count": later_count,
+        },
+        "reporting_change": {
+            "difference": difference,
+            "percent": change_percent,
+            "status": status,
+        },
+        "newly_observed": newly_observed,
+        "daily_timeline": daily_timeline,
+    }
+
+
 def build_event_clusters(articles, window_days=30, min_articles=2):
     """Group likely reports of the same event using title, topic, country and date overlap."""
     dated = []
@@ -622,6 +724,7 @@ def build_event_clusters(articles, window_days=30, min_articles=2):
                 {"name": name, "article_count": count}
                 for name, count in source_counts.most_common()
             ],
+            "development": build_event_development(members),
             "articles": member_articles,
         })
 
