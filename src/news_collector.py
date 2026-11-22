@@ -128,6 +128,7 @@ def collect_source(source_name, rss_url):
         "skipped_entries": 0,
         "warning": None,
         "error": None,
+        "attempt_errors": [],
     }
 
     for attempt in range(1, MAX_ATTEMPTS + 1):
@@ -151,6 +152,11 @@ def collect_source(source_name, rss_url):
 
             result["http_status"] = response.status_code
             response.raise_for_status()
+
+            # A previous attempt may have failed before this one succeeded.
+            # Keep that history separately, but don't label a successful
+            # collection with a stale final error.
+            result["error"] = None
 
             feed = feedparser.parse(response.content)
             result["feed_entries"] = len(feed.entries)
@@ -189,11 +195,21 @@ def collect_source(source_name, rss_url):
             return articles, result
 
         except requests.exceptions.RequestException as error:
-            result["error"] = str(error)
+            error_message = str(error)
+            result["error"] = error_message
+            result["attempt_errors"].append({
+                "attempt": attempt,
+                "error": error_message,
+            })
         except Exception as error:
             # Isolate unexpected source-specific errors so one feed cannot
             # stop collection from every other publisher.
-            result["error"] = f"{type(error).__name__}: {error}"
+            error_message = f"{type(error).__name__}: {error}"
+            result["error"] = error_message
+            result["attempt_errors"].append({
+                "attempt": attempt,
+                "error": error_message,
+            })
 
         if attempt < MAX_ATTEMPTS:
             time.sleep(RETRY_DELAY_SECONDS * attempt)
