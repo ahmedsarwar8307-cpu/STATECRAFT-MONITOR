@@ -22,6 +22,7 @@ function Events() {
   const [watchlist, setWatchlist] = useState([])
   const [watchlistError, setWatchlistError] = useState('')
   const [watchlistBusy, setWatchlistBusy] = useState(false)
+  const [watchlistMessage, setWatchlistMessage] = useState('')
 
   useEffect(() => {
     let active = true
@@ -67,6 +68,7 @@ function Events() {
     if (!selectedCluster || watchlistBusy) return
     setWatchlistBusy(true)
     setWatchlistError('')
+    setWatchlistMessage('')
     const isTracked = watchlist.some((item) => item.cluster_id === selectedCluster.cluster_id)
     try {
       const response = await fetch(
@@ -81,8 +83,14 @@ function Events() {
       if (!result.ok) throw new Error('Event updated, but watchlist could not refresh.')
       const refreshed = await result.json()
       setWatchlist(refreshed.events || [])
+      setWatchlistMessage(
+        isTracked
+          ? 'Event removed from your watchlist. Its profile remains open; only the saved tracking entry was removed.'
+          : 'Event successfully added to your watchlist. It is now listed in Tracked events above.'
+      )
     } catch (loadError) {
       setWatchlistError(loadError.message)
+      setWatchlistMessage(`Watchlist update failed: ${loadError.message}`)
     } finally {
       setWatchlistBusy(false)
     }
@@ -245,6 +253,11 @@ function Events() {
                   >
                     {watchlistBusy ? 'UPDATING WATCHLIST…' : watchlist.some((item) => item.cluster_id === selectedCluster.cluster_id) ? 'REMOVE FROM WATCHLIST' : '＋ TRACK THIS EVENT'}
                   </button>
+                  {watchlistMessage && (
+                    <p className={`event-action-feedback ${watchlistError ? 'error' : 'success'}`} role="status" aria-live="polite">
+                      {watchlistMessage}
+                    </p>
+                  )}
                   <p className="event-profile-summary">
                     This group contains {selectedCluster.article_count} reports
                     published between {formatDate(selectedCluster.first_seen)} and
