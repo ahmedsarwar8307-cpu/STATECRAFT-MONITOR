@@ -3440,3 +3440,21 @@
   .brief-evidence-row a{color:#222!important}
   a{color:#111!important;text-decoration:none!important}
 }
+
+
+/* AI SYNTHESIS WITHIN COUNTRY STRATEGIC ASSESSMENTS */
+.brief-ai-section{border-top:2px solid var(--accent)}
+.brief-ai-heading{display:flex;align-items:center;justify-content:space-between;gap:12px}
+.brief-ai-heading h3{margin-bottom:4px}
+.brief-ai-status{flex-shrink:0;padding:6px 8px;border:1px solid var(--border);color:var(--text-muted);font-size:8px;font-weight:700;letter-spacing:.6px}
+.brief-ai-status.is-ready{border-color:#426b5b;color:#72b99b}
+.brief-ai-intro{margin-top:4px;color:var(--text-muted);font-size:11px}
+.brief-ai-subsection{padding:13px 0;border-top:1px solid var(--border)}
+.brief-ai-subsection h4{margin:0 0 8px;color:var(--accent-light);font-size:12px;font-weight:700}
+.brief-ai-subsection ul{margin:0;padding-left:19px;color:var(--text-secondary);font-size:11px;line-height:1.8}
+.brief-ai-subsection li{padding:3px 0}
+.brief-ai-unavailable{padding:12px;border-left:2px solid var(--border);background:var(--bg-main)}
+.brief-ai-unavailable p{margin:0 0 7px;color:var(--text-secondary);font-size:11px;line-height:1.7}
+.brief-ai-unavailable small{color:var(--text-muted);font-size:10px;line-height:1.6}
+@media(max-width:440px){.brief-ai-heading{align-items:flex-start;flex-direction:column}}
+@media print{.brief-ai-status{color:#333!important;border-color:#aaa!important}.brief-ai-subsection h4{color:#222!important}.brief-ai-subsection ul{color:#333!important}}
