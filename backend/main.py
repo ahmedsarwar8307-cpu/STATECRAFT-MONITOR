@@ -1812,11 +1812,45 @@ def save_ai_assessment_cache(cache_key, assessment, generated_at):
 
 
 def build_ai_assessment_prompt(brief):
+    # Give the model an explicit summary of when coverage appeared, not only
+    # the period total. This helps distinguish sustained attention from a
+    # short-lived reporting burst.
+    timeline = brief.get("coverage_timeline", [])
+    active_days = [item for item in timeline if item.get("article_count", 0) > 0]
+    final_seven_days = timeline[-7:]
+    total_timeline_articles = sum(
+        item.get("article_count", 0) for item in timeline
+    )
+    final_seven_day_articles = sum(
+        item.get("article_count", 0) for item in final_seven_days
+    )
+    peak_daily_count = max(
+        (item.get("article_count", 0) for item in timeline),
+        default=0,
+    )
+    temporal_distribution = {
+        "active_days": len(active_days),
+        "days_in_period": len(timeline),
+        "first_active_date": active_days[0].get("date") if active_days else None,
+        "last_active_date": active_days[-1].get("date") if active_days else None,
+        "peak_daily_article_count": peak_daily_count,
+        "peak_dates": [
+            item.get("date") for item in timeline
+            if peak_daily_count and item.get("article_count", 0) == peak_daily_count
+        ],
+        "articles_in_final_7_days": final_seven_day_articles,
+        "final_7_day_share_percent": round(
+            final_seven_day_articles / total_timeline_articles * 100, 1
+        ) if total_timeline_articles else 0,
+    }
+
     evidence = {
         "country": brief.get("country"),
         "analysis_period": brief.get("period"),
         "comparison_period": brief.get("comparison_period"),
         "coverage_overview": brief.get("coverage_overview"),
+        "temporal_distribution": temporal_distribution,
+        "daily_coverage_timeline": timeline,
         "topic_analysis": brief.get("topic_analysis", []),
         "publisher_distribution": brief.get("source_distribution", []),
         "multi_publisher_event_coverage": brief.get("multi_publisher_event_coverage", []),
@@ -1840,6 +1874,14 @@ def build_ai_assessment_prompt(brief):
         "attention into a claim about real-world severity. Distinguish reported "
         "developments from your interpretation. Treat publisher names as source "
         "labels, not proof of independent verification. If evidence is thin, say so. "
+        "Make the comparison context explicit: compare current-period article and "
+        "publisher counts with the preceding equal-length period. If the previous "
+        "period has zero articles, describe the current coverage as newly observed "
+        "in this dataset and state that there is no meaningful percentage baseline; "
+        "do not call it a percentage increase. Use temporal_distribution and the "
+        "daily timeline to explain whether reporting was spread across the period "
+        "or concentrated into a short burst. Do not describe a late burst as a "
+        "sustained trend or ongoing escalation. "
         "Use the supplied article IDs only as internal evidence identifiers. Do NOT "
         "include database IDs, bracketed article references, or [Article ID: ...] labels "
         "in the reader-facing assessment. Write clean prose; the supporting headlines "
