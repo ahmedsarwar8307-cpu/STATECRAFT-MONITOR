@@ -481,13 +481,16 @@ EVENT_TITLE_STOPWORDS = {
     "should", "report", "reports", "latest", "live", "update", "updates",
     "news", "more", "than", "they", "them", "then", "also", "after",
     "first", "next", "amid", "during", "such", "its", "his", "her",
+    # Generic meeting language should not make separate diplomatic stories match.
+    "meet", "meeting", "leader", "leaders", "whether", "information",
 }
 
 
 def event_title_tokens(title):
     import re
 
-    words = re.findall(r"[a-z0-9]{3,}", (title or "").casefold())
+    # Keep "Xi" as a meaningful named-entity token despite its two-letter length.
+    words = re.findall(r"[a-z0-9]{3,}|(?<![a-z])xi(?![a-z])", (title or "").casefold())
     return {
         word for word in words
         if word not in EVENT_TITLE_STOPWORDS and not word.isdigit()
