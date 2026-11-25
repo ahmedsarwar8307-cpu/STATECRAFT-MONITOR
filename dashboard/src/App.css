@@ -3458,3 +3458,39 @@
 .brief-ai-unavailable small{color:var(--text-muted);font-size:10px;line-height:1.6}
 @media(max-width:440px){.brief-ai-heading{align-items:flex-start;flex-direction:column}}
 @media print{.brief-ai-status{color:#333!important;border-color:#aaa!important}.brief-ai-subsection h4{color:#222!important}.brief-ai-subsection ul{color:#333!important}}
+
+
+/* REPORT READABILITY — comfortable desktop typography */
+@media screen {
+  .strategic-brief .brief-section { padding: 25px; }
+  .strategic-brief .brief-section h3 { font-size: 23px; line-height: 1.4; }
+  .strategic-brief .brief-section > p { font-size: 14px; line-height: 1.85; }
+  .strategic-brief .brief-ai-intro { font-size: 13px; line-height: 1.8; }
+  .strategic-brief .brief-ai-subsection { padding: 16px 0; }
+  .strategic-brief .brief-ai-subsection h4 { font-size: 15px; line-height: 1.5; }
+  .strategic-brief .brief-ai-subsection ul { font-size: 14px; line-height: 1.9; }
+  .strategic-brief .brief-ai-subsection li { padding: 5px 0; }
+  .strategic-brief .brief-caveat,
+  .strategic-brief .brief-generated-note { font-size: 11px; line-height: 1.75; }
+  .strategic-brief .brief-metric span { font-size: 10px; }
+  .strategic-brief .brief-metric small { font-size: 11px; line-height: 1.6; }
+  .strategic-brief .brief-assessment-note { font-size: 12px; line-height: 1.8; }
+  .strategic-brief .brief-table th { font-size: 10px; }
+  .strategic-brief .brief-table td { font-size: 13px; line-height: 1.6; }
+  .strategic-brief .brief-source-list > div { font-size: 13px; line-height: 1.6; }
+  .strategic-brief .brief-event h4 { font-size: 15px; line-height: 1.55; }
+  .strategic-brief .brief-event > p { font-size: 12px; line-height: 1.7; }
+  .strategic-brief .brief-source-tags span { font-size: 11px; }
+  .strategic-brief .brief-evidence-row { padding: 15px 0; }
+  .strategic-brief .brief-evidence-row strong { font-size: 13px; line-height: 1.75; }
+  .strategic-brief .brief-evidence-row small { font-size: 11px; line-height: 1.7; }
+  .strategic-brief .brief-evidence-row a { font-size: 12px; }
+  .strategic-brief .brief-limitations { font-size: 13px; line-height: 1.9; }
+  .strategic-brief .brief-footnote { font-size: 12px !important; line-height: 1.8; }
+  .strategic-brief .brief-timeline strong { font-size: 10px; }
+  .strategic-brief .brief-timeline small { font-size: 9px; }
+  .strategic-brief .brief-cover-top,
+  .strategic-brief .brief-cover-bottom { font-size: 10px; line-height: 1.6; }
+  .strategic-brief .brief-cover-main p { font-size: 14px; }
+  .strategic-brief .brief-document-toolbar { font-size: 10px; }
+}
