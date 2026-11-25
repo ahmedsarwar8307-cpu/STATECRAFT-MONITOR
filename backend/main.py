@@ -347,7 +347,6 @@ def build_country_relationships(articles):
         "pairs": pairs,
     }
 
-
 def build_coverage_trends(articles, window_days=7):
     """Compare topic and country coverage in two windows ending at latest data date."""
     dated_articles = []
@@ -481,6 +480,7 @@ EVENT_TITLE_STOPWORDS = {
     "should", "report", "reports", "latest", "live", "update", "updates",
     "news", "more", "than", "they", "them", "then", "also", "after",
     "first", "next", "amid", "during", "such", "its", "his", "her",
+    "meet", "meeting", "leader", "leaders", "whether", "information",
 }
 
 
@@ -597,7 +597,12 @@ def build_event_development(members):
 
 
 def build_event_clusters(articles, window_days=30, min_articles=2):
-    """Group likely reports of the same event using title, topic, country and date overlap."""
+    """Group likely reports of the same event using conservative pairwise matching.
+
+    Clusters use complete-link membership: a new article must match every
+    existing member of a cluster. This prevents one loosely related article
+    from bridging two otherwise unrelated events.
+    """
     dated = []
     for article in articles:
         published_date = get_published_date(article.get("published"))
@@ -642,60 +647,66 @@ def build_event_clusters(articles, window_days=30, min_articles=2):
             },
         })
 
-    parent = list(range(len(prepared)))
+    def compatibility_score(first, second):
+        """Return title overlap score, or None when the pair is not a safe match."""
+        day_gap = abs((first["date"] - second["date"]).days)
+        if day_gap > 10:
+            return None
 
-    def find(index):
-        while parent[index] != index:
-            parent[index] = parent[parent[index]]
-            index = parent[index]
-        return index
+        shared_tokens = first["tokens"].intersection(second["tokens"])
+        # Two generic shared words are not enough to establish one event.
+        if len(shared_tokens) < 3:
+            return None
 
-    def union(left, right):
-        root_left, root_right = find(left), find(right)
-        if root_left != root_right:
-            parent[root_right] = root_left
+        shared_context = bool(
+            first["countries"].intersection(second["countries"])
+            or first["topics"].intersection(second["topics"])
+        )
+        if not shared_context:
+            return None
 
-    for left in range(len(prepared)):
-        first = prepared[left]
-        if len(first["tokens"]) < 2:
-            continue
+        union_tokens = first["tokens"].union(second["tokens"])
+        jaccard_similarity = (
+            len(shared_tokens) / len(union_tokens)
+            if union_tokens else 0
+        )
+        if jaccard_similarity < 0.20:
+            return None
 
-        for right in range(left + 1, len(prepared)):
-            second = prepared[right]
-            day_gap = abs((first["date"] - second["date"]).days)
-            if day_gap > 10:
-                continue
+        return jaccard_similarity
 
-            shared_tokens = first["tokens"].intersection(second["tokens"])
-            if len(shared_tokens) < 2:
-                continue
+    # Complete-link clustering: every article must match every member of the
+    # destination cluster. We deliberately do not merge clusters through a
+    # single intermediate article.
+    event_groups = []
+    for candidate in prepared:
+        eligible_groups = []
+        for group_index, group in enumerate(event_groups):
+            scores = [
+                compatibility_score(candidate, member)
+                for member in group
+            ]
+            if scores and all(score is not None for score in scores):
+                eligible_groups.append((sum(scores) / len(scores), group_index))
 
-            shared_context = bool(
-                first["countries"].intersection(second["countries"])
-                or first["topics"].intersection(second["topics"])
-            )
-            if not shared_context:
-                continue
-
-            title_similarity = len(shared_tokens) / max(
-                1, min(len(first["tokens"]), len(second["tokens"]))
-            )
-            if title_similarity >= 0.34:
-                union(left, right)
-
-    components = {}
-    for index in range(len(prepared)):
-        components.setdefault(find(index), []).append(prepared[index])
+        if eligible_groups:
+            _, best_group_index = max(eligible_groups)
+            event_groups[best_group_index].append(candidate)
+        else:
+            event_groups.append([candidate])
 
     clusters = []
     clustered_ids = set()
 
-    for members in components.values():
+    for members in event_groups:
         if len(members) < min_articles:
             continue
 
         member_articles = [item["article"] for item in members]
-        clustered_ids.update(article["id"] for article in member_articles)
+        clustered_ids.update(
+            article["id"] for article in member_articles
+            if article.get("id") is not None
+        )
 
         country_counts = Counter()
         topic_counts = Counter()
@@ -711,7 +722,10 @@ def build_event_clusters(articles, window_days=30, min_articles=2):
 
         dates = [item["date"] for item in members]
         clusters.append({
-            "cluster_id": min(article["id"] for article in member_articles),
+            "cluster_id": min(
+                article["id"] for article in member_articles
+                if article.get("id") is not None
+            ),
             "headline": member_articles[0].get("title") or "Untitled event",
             "article_count": len(member_articles),
             "first_seen": min(dates).isoformat(),
@@ -1047,7 +1061,6 @@ def get_countries():
             for country in parse_field(article.get("countries"))
             if country.casefold() != "unknown"
         }
-
         if countries:
             articles_with_countries += 1
 
@@ -1398,602 +1411,3 @@ def get_strategic_signals(days: int = Query(default=14, ge=7, le=30)):
             "change": None,
             "change_percent": None,
             "source_count": len(source_names),
-            "sources": source_names[:8],
-            "countries": [item.get("name") for item in cluster.get("countries", [])[:6]],
-            "topics": [item.get("name") for item in cluster.get("topics", [])[:6]],
-            "articles": [
-                {
-                    "id": article.get("id"),
-                    "title": article.get("title"),
-                    "source": article.get("source"),
-                    "published": article.get("published"),
-                    "link": article.get("link"),
-                }
-                for article in cluster.get("articles", [])[:5]
-            ],
-            "interpretation": (
-                f"This event cluster contains {cluster.get('article_count', 0)} "
-                f"related headlines from {len(source_names)} publishers. "
-                "This is evidence of cross-publisher coverage, not independent "
-                "verification of every claim in those reports."
-            ),
-        })
-
-    type_order = {"multi_source_event": 0, "country_shift": 1, "topic_shift": 2}
-    signals.sort(
-        key=lambda item: (
-            type_order.get(item["type"], 9),
-            -item.get("source_count", 0),
-            -item.get("recent_mentions", 0),
-            item["name"].casefold(),
-        ),
-        reverse=False,
-    )
-    signals = signals[:30]
-
-    return {
-        "available": True,
-        "days": days,
-        "latest_data_date": latest_date.isoformat(),
-        "recent_period": {
-            "start": recent_start.isoformat(),
-            "end": latest_date.isoformat(),
-            "article_count": len(recent),
-        },
-        "previous_period": {
-            "start": previous_start.isoformat(),
-            "end": previous_end.isoformat(),
-            "article_count": len(previous),
-        },
-        "articles_analysed": len(dated_articles),
-        "signals": signals,
-        "summary": {
-            "total_signals": len(signals),
-            "country_shifts": sum(item["type"] == "country_shift" for item in signals),
-            "topic_shifts": sum(item["type"] == "topic_shift" for item in signals),
-            "multi_source_events": sum(item["type"] == "multi_source_event" for item in signals),
-        },
-        "methodology": (
-            "Signals are generated from changes in collected headline coverage. "
-            "Country/topic shifts require at least two recent mentions and either "
-            "no previous-period mentions or an increase of at least two mentions "
-            "and 50 percent. Multi-source event signals require at least two "
-            "publishers in a candidate headline cluster. These are monitoring "
-            "indicators, not forecasts, severity ratings, or fact-check verdicts."
-        ),
-    }
-
-
-# Evidence-led country strategic assessment brief
-@app.get("/api/briefs/country/{country}")
-def get_country_strategic_brief(
-    country: str,
-    days: int = Query(default=30, ge=7, le=90),
-):
-    """Compile a traceable country brief from collected news metadata and headlines."""
-    all_articles = get_all_articles()
-    matched = [
-        article for article in all_articles
-        if any(
-            value.casefold() == country.casefold()
-            for value in parse_field(article.get("countries"))
-        )
-    ]
-
-    if not matched:
-        raise HTTPException(
-            status_code=404,
-            detail=f"No articles currently match {country}.",
-        )
-
-    dated = []
-    undated_count = 0
-    for article in matched:
-        published = get_published_date(article.get("published"))
-        if published:
-            dated.append((date.fromisoformat(published), article))
-        else:
-            undated_count += 1
-
-    if not dated:
-        raise HTTPException(
-            status_code=422,
-            detail=f"Articles for {country} do not contain usable publication dates.",
-        )
-
-    latest_date = max(item[0] for item in dated)
-    recent_start = latest_date - timedelta(days=days - 1)
-    previous_end = recent_start - timedelta(days=1)
-    previous_start = previous_end - timedelta(days=days - 1)
-
-    recent = [
-        article for published, article in dated
-        if recent_start <= published <= latest_date
-    ]
-    previous = [
-        article for published, article in dated
-        if previous_start <= published <= previous_end
-    ]
-
-    def count_dimension(items, field):
-        counts = Counter()
-        for article in items:
-            values = {
-                value for value in parse_field(article.get(field))
-                if value and value.casefold() != "unknown"
-            }
-            counts.update(values)
-        return counts
-
-    recent_topics = count_dimension(recent, "topics")
-    previous_topics = count_dimension(previous, "topics")
-    recent_sources = Counter(
-        article.get("source") for article in recent if article.get("source")
-    )
-    previous_sources = Counter(
-        article.get("source") for article in previous if article.get("source")
-    )
-
-    topic_comparison = []
-    for topic in set(recent_topics) | set(previous_topics):
-        current = recent_topics.get(topic, 0)
-        earlier = previous_topics.get(topic, 0)
-        topic_comparison.append({
-            "topic": topic,
-            "recent_articles": current,
-            "previous_articles": earlier,
-            "change": current - earlier,
-            "status": (
-                "new" if earlier == 0 and current > 0
-                else "rising" if current > earlier
-                else "declining" if current < earlier
-                else "stable"
-            ),
-        })
-    topic_comparison.sort(
-        key=lambda item: (item["recent_articles"], item["change"], item["topic"].casefold()),
-        reverse=True,
-    )
-
-    recent_count = len(recent)
-    previous_count = len(previous)
-    if previous_count == 0:
-        coverage_change = None
-        coverage_status = "no_comparison_baseline"
-    else:
-        coverage_change = round(
-            ((recent_count - previous_count) / previous_count) * 100, 1
-        )
-        coverage_status = (
-            "increased" if recent_count > previous_count
-            else "decreased" if recent_count < previous_count
-            else "unchanged"
-        )
-
-    source_count = len(recent_sources)
-    if recent_count < 5 or source_count < 2:
-        evidence_depth = "Limited"
-        evidence_note = "The selected period contains few articles or a narrow publisher mix. Treat this brief as an initial coverage snapshot."
-    elif recent_count < 15 or source_count < 3:
-        evidence_depth = "Developing"
-        evidence_note = "The selected period provides some cross-publisher coverage, but the evidence base remains modest."
-    else:
-        evidence_depth = "Broader"
-        evidence_note = "The selected period has a broader article and publisher base. This describes coverage depth, not factual accuracy."
-
-    event_result = build_event_clusters(recent, window_days=90, min_articles=2)
-    country_events = []
-    for cluster in event_result.get("clusters", []):
-        event_sources = [
-            item.get("name") for item in cluster.get("sources", [])
-            if item.get("name")
-        ]
-        if len(event_sources) >= 2:
-            country_events.append({
-                "headline": cluster.get("headline"),
-                "article_count": cluster.get("article_count", 0),
-                "source_count": len(event_sources),
-                "sources": event_sources,
-                "first_seen": cluster.get("first_seen"),
-                "latest_seen": cluster.get("latest_seen"),
-                "topics": [item.get("name") for item in cluster.get("topics", [])],
-                "articles": [
-                    {
-                        "id": article.get("id"),
-                        "title": article.get("title"),
-                        "source": article.get("source"),
-                        "published": article.get("published"),
-                        "link": article.get("link"),
-                    }
-                    for article in cluster.get("articles", [])[:5]
-                ],
-            })
-
-    country_events.sort(
-        key=lambda item: (item["article_count"], item["latest_seen"] or ""),
-        reverse=True,
-    )
-
-    timeline_counts = Counter(
-        published.isoformat() for published, _ in dated
-        if recent_start <= published <= latest_date
-    )
-    timeline = [
-        {
-            "date": (recent_start + timedelta(days=offset)).isoformat(),
-            "article_count": timeline_counts.get(
-                (recent_start + timedelta(days=offset)).isoformat(), 0
-            ),
-        }
-        for offset in range(days)
-    ]
-
-    recent_articles = [
-        {
-            "id": article.get("id"),
-            "title": article.get("title"),
-            "source": article.get("source"),
-            "published": article.get("published"),
-            "link": article.get("link"),
-            "topics": parse_field(article.get("topics")),
-        }
-        for article in recent
-    ]
-    recent_articles.sort(
-        key=lambda item: get_published_timestamp(item.get("published")),
-        reverse=True,
-    )
-
-    canonical_country = next(
-        (
-            value.strip()
-            for article in matched
-            for value in parse_field(article.get("countries"))
-            if value.casefold() == country.casefold()
-        ),
-        country,
-    )
-
-    return {
-        "available": True,
-        "brief_type": "Country Strategic Assessment",
-        "country": canonical_country,
-        "generated_at": datetime.now(timezone.utc).isoformat(),
-        "period_days": days,
-        "data_through": latest_date.isoformat(),
-        "period": {
-            "start": recent_start.isoformat(),
-            "end": latest_date.isoformat(),
-            "article_count": recent_count,
-        },
-        "comparison_period": {
-            "start": previous_start.isoformat(),
-            "end": previous_end.isoformat(),
-            "article_count": previous_count,
-        },
-        "coverage_overview": {
-            "recent_articles": recent_count,
-            "previous_articles": previous_count,
-            "change_percent": coverage_change,
-            "change_status": coverage_status,
-            "all_time_country_articles": len(matched),
-            "recent_source_count": source_count,
-            "previous_source_count": len(previous_sources),
-            "evidence_depth": evidence_depth,
-            "evidence_note": evidence_note,
-        },
-        "topic_analysis": [
-            {
-                **item,
-                "recent_share_percent": round(
-                    (item["recent_articles"] / recent_count) * 100, 1
-                ) if recent_count else 0,
-            }
-            for item in topic_comparison[:10]
-        ],
-        "source_distribution": [
-            {"source": source, "article_count": count}
-            for source, count in recent_sources.most_common()
-        ],
-        "multi_publisher_event_coverage": country_events[:8],
-        "coverage_timeline": timeline,
-        "key_headlines": recent_articles[:20],
-        "data_quality": {
-            "dated_country_articles": len(dated),
-            "undated_country_articles": undated_count,
-            "period_article_count": recent_count,
-            "period_source_count": source_count,
-            "limitations": [
-                "This brief analyses the STATECRAFT MONITOR collection, not all reporting published worldwide.",
-                "Country and topic labels are produced by the project's current rule-based recognition and classification pipeline.",
-                "Headline-level analysis cannot establish the full context or factual accuracy of an article.",
-                "Multiple publishers covering an event does not by itself constitute independent verification.",
-                "Coverage volume is not a measure of national stability, threat level, policy effectiveness or event severity.",
-            ],
-        },
-    }
-
-
-# Optional Gemini AI synthesis. The deterministic country assessment remains
-# available even when no API key is configured or the free quota is exhausted.
-def load_local_environment():
-    env_path = BASE_DIR / ".env"
-    if not env_path.exists():
-        return
-    for raw_line in env_path.read_text(encoding="utf-8-sig").splitlines():
-        line = raw_line.strip()
-        if not line or line.startswith("#") or "=" not in line:
-            continue
-        name, value = line.split("=", 1)
-        name = name.strip()
-        value = value.strip().strip('"').strip("'")
-        if name and value and name not in os.environ:
-            os.environ[name] = value
-
-
-load_local_environment()
-
-
-def build_ai_assessment_cache_key(brief, model):
-    evidence_fingerprint = {
-        "country": brief.get("country"),
-        "model": model,
-        "prompt_version": 2,
-        "period_days": brief.get("period_days"),
-        "data_through": brief.get("data_through"),
-        "coverage_overview": brief.get("coverage_overview"),
-        "topic_analysis": brief.get("topic_analysis"),
-        "source_distribution": brief.get("source_distribution"),
-        "multi_publisher_event_coverage": brief.get("multi_publisher_event_coverage"),
-        "key_headlines": brief.get("key_headlines"),
-    }
-    encoded = json.dumps(
-        evidence_fingerprint, sort_keys=True, ensure_ascii=False
-    ).encode("utf-8")
-    return hashlib.sha256(encoded).hexdigest()
-
-
-def get_cached_ai_assessment(cache_key):
-    connection = get_database_connection()
-    try:
-        connection.execute("""
-            CREATE TABLE IF NOT EXISTS ai_brief_cache (
-                cache_key TEXT PRIMARY KEY,
-                assessment_json TEXT NOT NULL,
-                generated_at TEXT NOT NULL
-            )
-        """)
-        connection.commit()
-        row = connection.execute(
-            "SELECT assessment_json, generated_at FROM ai_brief_cache WHERE cache_key = ?",
-            (cache_key,),
-        ).fetchone()
-        if not row:
-            return None
-        return {
-            "assessment": json.loads(row["assessment_json"]),
-            "generated_at": row["generated_at"],
-            "cached": True,
-        }
-    finally:
-        connection.close()
-
-
-def save_ai_assessment_cache(cache_key, assessment, generated_at):
-    connection = get_database_connection()
-    try:
-        connection.execute("""
-            CREATE TABLE IF NOT EXISTS ai_brief_cache (
-                cache_key TEXT PRIMARY KEY,
-                assessment_json TEXT NOT NULL,
-                generated_at TEXT NOT NULL
-            )
-        """)
-        connection.execute(
-            """
-            INSERT OR REPLACE INTO ai_brief_cache
-            (cache_key, assessment_json, generated_at)
-            VALUES (?, ?, ?)
-            """,
-            (
-                cache_key,
-                json.dumps(assessment, ensure_ascii=False),
-                generated_at,
-            ),
-        )
-        connection.commit()
-    finally:
-        connection.close()
-
-
-def build_ai_assessment_prompt(brief):
-    evidence = {
-        "country": brief.get("country"),
-        "analysis_period": brief.get("period"),
-        "comparison_period": brief.get("comparison_period"),
-        "coverage_overview": brief.get("coverage_overview"),
-        "topic_analysis": brief.get("topic_analysis", []),
-        "publisher_distribution": brief.get("source_distribution", []),
-        "multi_publisher_event_coverage": brief.get("multi_publisher_event_coverage", []),
-        "key_headlines": [
-            {
-                "article_id": item.get("id"),
-                "headline": item.get("title"),
-                "publisher": item.get("source"),
-                "published": item.get("published"),
-                "topics": item.get("topics", []),
-            }
-            for item in brief.get("key_headlines", [])
-        ],
-        "known_limitations": brief.get("data_quality", {}).get("limitations", []),
-    }
-    return (
-        "You are the analytical writing component of STATECRAFT MONITOR, an "
-        "evidence-led geopolitical news monitoring platform. Prepare a cautious "
-        "country strategic assessment using ONLY the supplied evidence package. "
-        "Do not use outside knowledge, invent facts, infer motives, or turn media "
-        "attention into a claim about real-world severity. Distinguish reported "
-        "developments from your interpretation. Treat publisher names as source "
-        "labels, not proof of independent verification. If evidence is thin, say so. "
-        "Use the supplied article IDs only as internal evidence identifiers. Do NOT "
-        "include database IDs, bracketed article references, or [Article ID: ...] labels "
-        "in the reader-facing assessment. Write clean prose; the supporting headlines "
-        "and original-report links in the report provide reader-facing traceability. "
-        "Potential implications must be explicitly framed as conditional analytical "
-        "possibilities, not predictions. Identify uncertainty and information gaps. "
-        "Return ONLY valid JSON with exactly these keys, each value an array of "
-        "2-4 concise strings: executive_overview, major_developments, "
-        "analytical_observations, potential_implications, uncertainties_information_gaps. "
-        "No markdown fences and no extra keys.\n\nEVIDENCE PACKAGE:\n"
-        + json.dumps(evidence, ensure_ascii=False)
-    )
-
-
-def generate_gemini_assessment(brief):
-    api_key = os.getenv("GEMINI_API_KEY") or os.getenv("GOOGLE_API_KEY")
-    if not api_key:
-        raise HTTPException(
-            status_code=503,
-            detail="Gemini is not configured yet. Add GEMINI_API_KEY to the local .env file.",
-        )
-
-    model = (os.getenv("GEMINI_MODEL") or "gemini-3.5-flash-lite").strip()
-    cache_key = build_ai_assessment_cache_key(brief, model)
-    cached = get_cached_ai_assessment(cache_key)
-    if cached:
-        return {
-            "available": True,
-            "provider": "Google Gemini",
-            "model": model,
-            **cached,
-        }
-
-    endpoint = (
-        "https://generativelanguage.googleapis.com/v1beta/models/"
-        + model
-        + ":generateContent"
-    )
-    payload = {
-        "contents": [{
-            "role": "user",
-            "parts": [{"text": build_ai_assessment_prompt(brief)}],
-        }],
-        "generationConfig": {
-            "temperature": 0.25,
-            "maxOutputTokens": 1800,
-            "responseMimeType": "application/json",
-        },
-    }
-
-    try:
-        response = requests.post(
-            endpoint,
-            headers={
-                "x-goog-api-key": api_key,
-                "Content-Type": "application/json",
-            },
-            json=payload,
-            timeout=(10, 60),
-        )
-    except requests.RequestException:
-        raise HTTPException(
-            status_code=502,
-            detail="Could not reach Gemini. Check your internet connection and try again.",
-        )
-
-    if response.status_code == 429:
-        raise HTTPException(
-            status_code=429,
-            detail="Gemini's free-tier request limit has been reached. Try again later; your evidence-based report is still available.",
-        )
-    if response.status_code in (401, 403):
-        raise HTTPException(
-            status_code=502,
-            detail="Gemini rejected the API key or project access. Check the key in Google AI Studio.",
-        )
-    if response.status_code in (503, 504):
-        raise HTTPException(
-            status_code=503,
-            detail="Gemini is temporarily experiencing high demand or is unavailable. Your evidence-based report is still available; try AI synthesis again later.",
-        )
-    if response.status_code == 404:
-        raise HTTPException(
-            status_code=502,
-            detail=f"The configured Gemini model '{model}' was not found or is not available to this API key. Check GEMINI_MODEL in your local .env file.",
-        )
-    if not response.ok:
-        raise HTTPException(
-            status_code=502,
-            detail=f"Gemini returned an API error (HTTP {response.status_code}). Check the configured model and API access.",
-        )
-
-    try:
-        response_data = response.json()
-        generated_text = response_data["candidates"][0]["content"]["parts"][0]["text"]
-        assessment = json.loads(generated_text)
-        required_sections = (
-            "executive_overview",
-            "major_developments",
-            "analytical_observations",
-            "potential_implications",
-            "uncertainties_information_gaps",
-        )
-        if not isinstance(assessment, dict) or any(
-            not isinstance(assessment.get(section), list)
-            or not assessment[section]
-            for section in required_sections
-        ):
-            raise ValueError("Gemini response did not match the required assessment structure.")
-        assessment = {
-            section: [str(item).strip()[:1200] for item in assessment[section][:4] if str(item).strip()]
-            for section in required_sections
-        }
-        if any(not assessment[section] for section in required_sections):
-            raise ValueError("Gemini returned an empty assessment section.")
-
-        # Reject citations that point to article IDs outside the supplied evidence.
-        import re
-        valid_article_ids = {
-            str(item.get("id"))
-            for item in brief.get("key_headlines", [])
-            if item.get("id") is not None
-        }
-        for event in brief.get("multi_publisher_event_coverage", []):
-            valid_article_ids.update(
-                str(item.get("id"))
-                for item in event.get("articles", [])
-                if item.get("id") is not None
-            )
-        cited_ids = {
-            match for value_list in assessment.values()
-            for value in value_list
-            for match in re.findall(r"\[Article ID:\s*(\d+)\]", value, flags=re.IGNORECASE)
-        }
-        if not cited_ids.issubset(valid_article_ids):
-            raise ValueError("Gemini cited an article ID that was not supplied in the evidence.")
-    except (KeyError, IndexError, TypeError, ValueError, json.JSONDecodeError):
-        raise HTTPException(
-            status_code=502,
-            detail="Gemini responded, but its assessment could not be validated. Please try again.",
-        )
-
-    generated_at = datetime.now(timezone.utc).isoformat()
-    save_ai_assessment_cache(cache_key, assessment, generated_at)
-    return {
-        "available": True,
-        "provider": "Google Gemini",
-        "model": model,
-        "assessment": assessment,
-        "generated_at": generated_at,
-        "cached": False,
-    }
-
-
-@app.get("/api/briefs/country/{country}/ai")
-def get_ai_country_strategic_assessment(
-    country: str,
-    days: int = Query(default=30, ge=7, le=90),
-):
-    """Generate a cached AI interpretation from the existing evidence-led brief."""
-    brief = get_country_strategic_brief(country, days)
-    return generate_gemini_assessment(brief)
