@@ -3,6 +3,13 @@ import { FileText, Printer, RefreshCw } from 'lucide-react'
 
 const API_BASE = 'http://127.0.0.1:8000'
 
+function cleanAssessmentText(value) {
+  return String(value || '')
+    .replace(/\s*\[Article ID:\s*\d+\]/gi, '')
+    .replace(/\s{2,}/g, ' ')
+    .trim()
+}
+
 function formatDate(value) {
   if (!value) return 'Date unavailable'
   const date = new Date(value.includes('T') ? value : `${value}T00:00:00`)
@@ -191,7 +198,7 @@ function Reports() {
                 ].map(([heading, items]) => (
                   <div className="brief-ai-subsection" key={heading}>
                     <h4>{heading}</h4>
-                    <ul>{items.map((item, index) => <li key={index}>{item}</li>)}</ul>
+                    <ul>{items.map((item, index) => <li key={index}>{cleanAssessmentText(item)}</li>)}</ul>
                   </div>
                 ))}
                 <small className="brief-caveat">
