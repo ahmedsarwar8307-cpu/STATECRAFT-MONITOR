@@ -180,7 +180,7 @@ function Reports() {
             {brief.ai_assessment?.available ? (
               <>
                 <p className="brief-ai-intro">
-                  AI-assisted interpretation of the collected headlines and metadata. Concrete developments should be read alongside the article IDs and original source reports cited below.
+                  AI-assisted interpretation of the collected headlines and metadata. Supporting headlines, publisher details and original-report links below provide the reader-facing evidence trail.
                 </p>
                 {[
                   ['Executive overview', brief.ai_assessment.assessment.executive_overview],
