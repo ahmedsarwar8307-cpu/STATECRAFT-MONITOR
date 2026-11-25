@@ -1738,6 +1738,7 @@ def build_ai_assessment_cache_key(brief, model):
     evidence_fingerprint = {
         "country": brief.get("country"),
         "model": model,
+        "prompt_version": 2,
         "period_days": brief.get("period_days"),
         "data_through": brief.get("data_through"),
         "coverage_overview": brief.get("coverage_overview"),
@@ -1834,8 +1835,10 @@ def build_ai_assessment_prompt(brief):
         "attention into a claim about real-world severity. Distinguish reported "
         "developments from your interpretation. Treat publisher names as source "
         "labels, not proof of independent verification. If evidence is thin, say so. "
-        "Every concrete development should include supporting article IDs in the "
-        "form [Article ID: 123]. Do not cite an ID that is not in the evidence. "
+        "Use the supplied article IDs only as internal evidence identifiers. Do NOT "
+        "include database IDs, bracketed article references, or [Article ID: ...] labels "
+        "in the reader-facing assessment. Write clean prose; the supporting headlines "
+        "and original-report links in the report provide reader-facing traceability. "
         "Potential implications must be explicitly framed as conditional analytical "
         "possibilities, not predictions. Identify uncertainty and information gaps. "
         "Return ONLY valid JSON with exactly these keys, each value an array of "
