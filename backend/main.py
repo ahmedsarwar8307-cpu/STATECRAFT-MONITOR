@@ -1743,10 +1743,11 @@ def build_ai_assessment_cache_key(brief, model):
     evidence_fingerprint = {
         "country": brief.get("country"),
         "model": model,
-        "prompt_version": 2,
+        "prompt_version": 3,
         "period_days": brief.get("period_days"),
         "data_through": brief.get("data_through"),
         "coverage_overview": brief.get("coverage_overview"),
+        "coverage_timeline": brief.get("coverage_timeline"),
         "topic_analysis": brief.get("topic_analysis"),
         "source_distribution": brief.get("source_distribution"),
         "multi_publisher_event_coverage": brief.get("multi_publisher_event_coverage"),
